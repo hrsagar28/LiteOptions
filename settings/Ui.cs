@@ -160,8 +160,20 @@ namespace LiteOptions.SettingsApp
         public static Task Info(string title, string message) => ShowAsync(Dialog(title, Text(message), null, "OK"));
     }
 
+    /// <summary>A Windows 11 settings card (WinUI's Border is sealed, so cards wrap one).</summary>
+    class CardBox : UserControl
+    {
+        protected readonly Border Box;
+        public CardBox()
+        {
+            Box = new Border { Style = Ui.Style("Card") };
+            Content = Box;
+            IsTabStop = false;
+        }
+    }
+
     /// <summary>Card with an icon, a title, a description and a control on the right: the Windows 11 Settings look.</summary>
-    sealed class SettingCard : Border
+    sealed class SettingCard : CardBox
     {
         readonly TextBlock title, desc;
         readonly FontIcon icon;
@@ -170,7 +182,6 @@ namespace LiteOptions.SettingsApp
 
         public SettingCard(string glyph, string title, string description, UIElement control = null, bool stackControl = false)
         {
-            Style = Ui.Style("Card");
             grid = new Grid { ColumnSpacing = 16 };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -203,7 +214,7 @@ namespace LiteOptions.SettingsApp
             }
             else Grid.SetColumn(right, 2);
             grid.Children.Add(right);
-            Child = grid;
+            Box.Child = grid;
         }
 
         public string Title { get => title.Text; set => title.Text = value ?? ""; }
@@ -222,8 +233,8 @@ namespace LiteOptions.SettingsApp
         /// <summary>Indented look for cards that belong to the card above.</summary>
         public SettingCard Indent()
         {
-            Padding = new Thickness(56, 10, 16, 10);
-            MinHeight = 56;
+            Box.Padding = new Thickness(56, 10, 16, 10);
+            Box.MinHeight = 56;
             return this;
         }
 
@@ -231,20 +242,19 @@ namespace LiteOptions.SettingsApp
 
         public async void Flash()
         {
-            Style = Ui.Style("CardFlash");
+            Box.Style = Ui.Style("CardFlash");
             await Task.Delay(1400);
-            Style = Ui.Style("Card");
+            Box.Style = Ui.Style("Card");
         }
     }
 
     /// <summary>A card that only holds text (tips and notes).</summary>
-    sealed class NoteCard : Border
+    sealed class NoteCard : CardBox
     {
         readonly TextBlock text;
         public NoteCard(string message, string glyph = Glyph.Info)
         {
-            Style = Ui.Style("Card");
-            MinHeight = 0;
+            Box.MinHeight = 0;
             var g = new Grid { ColumnSpacing = 14 };
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -253,7 +263,7 @@ namespace LiteOptions.SettingsApp
             Grid.SetColumn(text, 1);
             g.Children.Add(i);
             g.Children.Add(text);
-            Child = g;
+            Box.Child = g;
         }
         public string Message { get => text.Text; set => text.Text = value ?? ""; }
         public bool Shown { set => Visibility = value ? Visibility.Visible : Visibility.Collapsed; }

@@ -15,7 +15,7 @@ namespace LiteOptions.SettingsApp
     /// The device card at the top of the Mouse and Keyboard pages: a drawing of the device whose parts you can click,
     /// next to its name, connection, battery and firmware.
     /// </summary>
-    sealed class DeviceHero : Border
+    sealed class DeviceHero : CardBox
     {
         readonly bool mouse;
         readonly Canvas art;
@@ -28,8 +28,7 @@ namespace LiteOptions.SettingsApp
         public DeviceHero(bool mouse)
         {
             this.mouse = mouse;
-            Style = Ui.Style("Card");
-            Padding = new Thickness(20, 18, 24, 18);
+            Box.Padding = new Thickness(20, 18, 24, 18);
 
             var g = new Grid { ColumnSpacing = 28 };
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -51,7 +50,7 @@ namespace LiteOptions.SettingsApp
             info.VerticalAlignment = VerticalAlignment.Center;
             Grid.SetColumn(info, 1);
             g.Children.Add(info);
-            Child = g;
+            Box.Child = g;
 
             ActualThemeChanged += (s, e) => Draw();
             Loaded += (s, e) => Draw();
