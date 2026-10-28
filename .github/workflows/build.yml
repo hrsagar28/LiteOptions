@@ -208,7 +208,6 @@ jobs:
           name: LiteOptions ${{ steps.v.outputs.version }}
           make_latest: true
           files: dist/*.exe
-          append_body: ${{ github.event_name == 'release' }}
           body: |
             **Which file?** Surface Laptop and other Snapdragon PCs: **LiteOptions-ARM64.exe**. Intel/AMD PCs: **LiteOptions-x64.exe**.
 
