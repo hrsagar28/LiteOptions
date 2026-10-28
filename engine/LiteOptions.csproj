@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The background engine: tray icon, device link, remapping. .NET Framework 4.8 (built into Windows), AnyCPU so it runs natively on ARM64. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>LiteOptions</AssemblyName>
+    <RootNamespace>LiteOptions</RootNamespace>
+    <LangVersion>10</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
+    <ApplicationIcon>..\assets\app.ico</ApplicationIcon>
+    <ApplicationManifest>..\assets\app.manifest</ApplicationManifest>
+    <NoWarn>1701;1702;0649</NoWarn>
+    <DebugType>none</DebugType>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- the zipped WinUI settings window that the installer unpacks; pass -p:SettingsZip=... per architecture -->
+    <SettingsZip Condition="'$(SettingsZip)' == ''">$(MSBuildThisFileDirectory)..\out\settings.zip</SettingsZip>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\src\**\*.cs" />
+    <Compile Include="..\assets\AssemblyInfo.cs" />
+    <EmbeddedResource Include="..\assets\tray.ico" LogicalName="LiteOptions.app.ico" />
+    <EmbeddedResource Include="..\assets\logo.png" LogicalName="LiteOptions.logo.png" />
+    <EmbeddedResource Include="$(SettingsZip)" LogicalName="LiteOptions.settings.zip" Condition="Exists('$(SettingsZip)')" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

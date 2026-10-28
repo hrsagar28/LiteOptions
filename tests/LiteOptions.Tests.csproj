@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Engine tests against simulated Logitech devices. Run the exe; it prints each check and exits 1 on any failure. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>LiteOptionsTests</AssemblyName>
+    <RootNamespace>LiteOptions.Tests</RootNamespace>
+    <StartupObject>LiteOptions.Tests.TestMain</StartupObject>
+    <LangVersion>10</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
+    <NoWarn>1701;1702;0649</NoWarn>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\src\**\*.cs" Exclude="..\src\Program.cs" />
+    <Compile Include="..\assets\AssemblyInfo.cs" />
+    <Compile Include="Fakes.cs" />
+    <Compile Include="Tests.cs" />
+    <EmbeddedResource Include="..\assets\tray.ico" LogicalName="LiteOptions.app.ico" />
+    <EmbeddedResource Include="..\assets\logo.png" LogicalName="LiteOptions.logo.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

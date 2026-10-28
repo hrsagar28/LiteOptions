@@ -1,0 +1,196 @@
+name: build
+
+# Builds the engine and the WinUI 3 settings window, runs the engine tests, then installs the result on
+# real Windows (x64 and ARM64), runs the window's self-test against the engine, takes screenshots and
+# uninstalls again. Results go to the ci-results branch; tagged builds (v*) become a GitHub release.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Engine tests (simulated Pebble and K380)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          dotnet build tests/LiteOptions.Tests.csproj -c Release -o out/tests
+          if ($LASTEXITCODE) { exit 1 }
+          & ./out/tests/LiteOptionsTests.exe | Tee-Object -FilePath out/tests.txt
+          if ($LASTEXITCODE) { exit 1 }
+
+      - name: Settings window (WinUI 3) for x64 and ARM64
+        shell: pwsh
+        run: |
+          dotnet publish settings/LiteOptions.Settings.csproj -c Release -r win-x64 -p:Platform=x64 -o out/settings-x64
+          if ($LASTEXITCODE) { exit 1 }
+          dotnet publish settings/LiteOptions.Settings.csproj -c Release -r win-arm64 -p:Platform=ARM64 -o out/settings-ARM64
+          if ($LASTEXITCODE) { exit 1 }
+          foreach ($a in 'x64', 'ARM64') {
+            Get-ChildItem "out/settings-$a" -Recurse -File -Filter *.pdb | Remove-Item
+            [IO.Compression.ZipFile]::CreateFromDirectory("$pwd/out/settings-$a", "$pwd/out/settings-$a.zip", [IO.Compression.CompressionLevel]::Optimal, $false)
+          }
+          Get-ChildItem out/settings-ARM64 -Recurse -File | Sort-Object Length -Descending |
+            Select-Object @{n='KB';e={[math]::Round($_.Length/1KB)}}, @{n='File';e={$_.FullName.Substring((Resolve-Path out/settings-ARM64).Path.Length)}} |
+            Format-Table -AutoSize | Out-String -Width 400 | Set-Content out/settings-files.txt
+
+      - name: Installers (engine with the window inside)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          foreach ($a in 'x64', 'ARM64') {
+            dotnet build engine/LiteOptions.csproj -c Release --no-incremental "-p:SettingsZip=$pwd/out/settings-$a.zip" -o "out/engine-$a"
+            if ($LASTEXITCODE) { exit 1 }
+            Copy-Item "out/engine-$a/LiteOptions.exe" "dist/LiteOptions-$a.exe"
+          }
+          Get-ChildItem dist, out/*.zip | ForEach-Object { "{0,-28} {1,8:N1} MB" -f $_.Name, ($_.Length / 1MB) } | Tee-Object -FilePath out/sizes.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers
+          path: dist/*.exe
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-info
+          path: out/*.txt
+
+  smoke:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+          - os: windows-11-arm
+            arch: ARM64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: installers
+          path: dist
+
+      - name: Install, self-test, open from the engine, screenshots, uninstall
+        shell: pwsh
+        run: |
+          $arch = '${{ matrix.arch }}'
+          $r = Join-Path $pwd "results-$arch"
+          New-Item -ItemType Directory -Force $r | Out-Null
+          $log = Join-Path $r 'smoke.txt'
+          function Say($t) { $t | Tee-Object -FilePath $log -Append }
+          function Mem($p) { if ($p) { "{0:N1} MB private, {1:N1} MB working set" -f ($p.PrivateMemorySize64 / 1MB), ($p.WorkingSet64 / 1MB) } else { 'not running' } }
+          Say "Windows $([Environment]::OSVersion.Version) on $env:PROCESSOR_ARCHITECTURE"
+
+          # skip the first-run setup so nothing opens by itself
+          $cfg = Join-Path $env:APPDATA 'LiteOptions'
+          New-Item -ItemType Directory -Force $cfg | Out-Null
+          '{"Version":2,"Profiles":[],"FirstRunDone":true,"SetupDone":true}' | Set-Content (Join-Path $cfg 'settings.json')
+
+          $inst = Get-Item "dist/LiteOptions-$arch.exe"
+          Say ("installer: {0:N1} MB" -f ($inst.Length / 1MB))
+          $p = Start-Process $inst.FullName -ArgumentList '--install', '--no-start' -PassThru -Wait
+          Say "install exit code: $($p.ExitCode)"
+          $dir = Join-Path $env:LOCALAPPDATA 'Programs\LiteOptions'
+          $ui = Join-Path $dir 'Settings\LiteOptions.Settings.exe'
+          if (!(Test-Path $ui)) { Say 'FAIL: the settings window was not installed'; exit 1 }
+          Say ("installed size: {0:N1} MB" -f ((Get-ChildItem $dir -Recurse -File | Measure-Object Length -Sum).Sum / 1MB))
+
+          # the engine, as it runs after sign-in
+          Start-Process (Join-Path $dir 'LiteOptions.exe') -ArgumentList '--tray'
+          Start-Sleep 8
+          Say "engine idle: $(Mem (Get-Process LiteOptions -ErrorAction SilentlyContinue))"
+
+          # 1. self-test: the window starts, talks to the engine, settings survive a round trip
+          $p = Start-Process $ui -ArgumentList '--selftest', (Join-Path $r 'selftest.txt') -PassThru
+          if (!$p.WaitForExit(120000)) { $p.Kill(); Say 'FAIL: self-test hung' }
+          $selftest = $p.ExitCode
+          Say "self-test exit code: $selftest"
+          Get-Content (Join-Path $r 'selftest.txt') -ErrorAction SilentlyContinue | ForEach-Object { Say "  $_" }
+
+          # 2. the normal way in: start LiteOptions again and the engine opens the window
+          Start-Process (Join-Path $dir 'LiteOptions.exe')
+          Start-Sleep 12
+          $w = Get-Process LiteOptions.Settings -ErrorAction SilentlyContinue
+          Say "window opened by the engine: $(Mem $w)"
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save((Join-Path $r 'desktop.png'))
+          $g.Dispose(); $bmp.Dispose()
+          if ($w) { $w.CloseMainWindow() | Out-Null; Start-Sleep 3 }
+          Say "after closing the window: window $(Mem (Get-Process LiteOptions.Settings -ErrorAction SilentlyContinue)); engine $(Mem (Get-Process LiteOptions -ErrorAction SilentlyContinue))"
+
+          # 3. pictures of every page and dialog, with pretend devices
+          $p = Start-Process $ui -ArgumentList '--shots', (Join-Path $r 'shots') -PassThru
+          if (!$p.WaitForExit(300000)) { $p.Kill(); Say 'screenshot tour hung' }
+          Say "screenshots taken: $((Get-ChildItem (Join-Path $r 'shots') -Filter *.png -ErrorAction SilentlyContinue).Count)"
+
+          Copy-Item (Join-Path $cfg 'log.txt') $r -ErrorAction SilentlyContinue
+
+          # 4. uninstall
+          $p = Start-Process (Join-Path $dir 'LiteOptions.exe') -ArgumentList '--uninstall', '--quiet' -PassThru -Wait
+          Start-Sleep 10
+          Say "uninstall exit code: $($p.ExitCode); folder removed: $(!(Test-Path $dir)); processes left: $(@(Get-Process -Name 'LiteOptions*' -ErrorAction SilentlyContinue).Count)"
+          if ($selftest -ne 0) { exit 1 }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-${{ matrix.arch }}
+          path: results-${{ matrix.arch }}
+
+  results:
+    needs: [build, smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: r
+      - name: Publish results to the ci-results branch
+        run: |
+          rm -rf r/installers
+          cd r
+          echo "run ${{ github.run_id }} for ${{ github.sha }} (${{ github.ref_name }})" > RUN.txt
+          git init -q -b ci-results
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -qm "results of run ${{ github.run_id }}"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" ci-results
+
+  release:
+    needs: [build, smoke]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: installers
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: LiteOptions ${{ github.ref_name }}
+          files: dist/*.exe
+          body: |
+            **Which file?** Surface Laptop and other Snapdragon PCs: **LiteOptions-ARM64.exe**. Intel/AMD PCs: **LiteOptions-x64.exe**.
+
+            Double-click it to install or update (your settings are kept). Windows may say "Windows protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
