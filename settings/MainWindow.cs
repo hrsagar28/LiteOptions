@@ -16,7 +16,7 @@ using Windows.Graphics;
 
 namespace LiteOptions.SettingsApp
 {
-    public sealed class MainWindow : Window
+    public sealed partial class MainWindow : Window
     {
         public static IntPtr Hwnd;
         readonly Store store;
@@ -316,6 +316,7 @@ namespace LiteOptions.SettingsApp
         {
             root.RequestedTheme = theme;
             Ui.Theme = theme;
+            OnDevices(); // redraws the device pictures in the new colours
             try
             {
                 var tb = AppWindow.TitleBar;

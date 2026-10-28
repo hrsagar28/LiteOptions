@@ -161,7 +161,7 @@ namespace LiteOptions.SettingsApp
     }
 
     /// <summary>A Windows 11 settings card (WinUI's Border is sealed, so cards wrap one).</summary>
-    class CardBox : UserControl
+    partial class CardBox : UserControl
     {
         protected readonly Border Box;
         public CardBox()
@@ -173,7 +173,7 @@ namespace LiteOptions.SettingsApp
     }
 
     /// <summary>Card with an icon, a title, a description and a control on the right: the Windows 11 Settings look.</summary>
-    sealed class SettingCard : CardBox
+    sealed partial class SettingCard : CardBox
     {
         readonly TextBlock title, desc;
         readonly FontIcon icon;
@@ -249,7 +249,7 @@ namespace LiteOptions.SettingsApp
     }
 
     /// <summary>A card that only holds text (tips and notes).</summary>
-    sealed class NoteCard : CardBox
+    sealed partial class NoteCard : CardBox
     {
         readonly TextBlock text;
         public NoteCard(string message, string glyph = Glyph.Info)

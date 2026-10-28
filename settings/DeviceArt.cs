@@ -15,7 +15,7 @@ namespace LiteOptions.SettingsApp
     /// The device card at the top of the Mouse and Keyboard pages: a drawing of the device whose parts you can click,
     /// next to its name, connection, battery and firmware.
     /// </summary>
-    sealed class DeviceHero : CardBox
+    sealed partial class DeviceHero : CardBox
     {
         readonly bool mouse;
         readonly Canvas art;
@@ -23,6 +23,7 @@ namespace LiteOptions.SettingsApp
         readonly FontIcon batteryIcon;
         readonly Ellipse dot;
         readonly StackPanel batteryRow;
+        bool? drawnDark;
         public event Action<string> HotspotClicked;
 
         public DeviceHero(bool mouse)
@@ -52,12 +53,13 @@ namespace LiteOptions.SettingsApp
             g.Children.Add(info);
             Box.Child = g;
 
-            ActualThemeChanged += (s, e) => Draw();
+            ActualThemeChanged += (s, e) => DispatcherQueue.TryEnqueue(Draw);
             Loaded += (s, e) => Draw();
         }
 
         public void Fill(DeviceDto d, string missing, string missingHint, bool low)
         {
+            if (IsLoaded && drawnDark != Dark) Draw();
             name.Text = d?.Name ?? missing;
             if (d == null)
             {
@@ -119,6 +121,7 @@ namespace LiteOptions.SettingsApp
 
         void Draw()
         {
+            drawnDark = Dark;
             art.Children.Clear();
             if (mouse) DrawMouse(); else DrawKeyboard();
         }
@@ -204,7 +207,7 @@ namespace LiteOptions.SettingsApp
             }
             // bottom row with the space bar and arrows
             double bx = x0;
-            foreach (var w in new double[] { 1, 1, 1, 1.2, 5.6, 1.2, 1, 1, 1, 1 })
+            foreach (var w in new double[] { 1, 1, 1, 1.2, 4.6, 1.2, 1, 1, 1, 1 })
             {
                 double width = w * pitch - 3.4;
                 art.Children.Add(Place(new Rectangle { Width = width, Height = 14, RadiusX = 7, RadiusY = 7, Fill = keyFill, Stroke = keyEdge, StrokeThickness = 0.8 }, bx, y));

@@ -15,7 +15,7 @@ using Windows.Storage.Pickers;
 namespace LiteOptions.SettingsApp
 {
     /// <summary>The action chooser: a drop-down button whose menu groups the presets, plus custom actions.</summary>
-    sealed class ActionPicker : DropDownButton
+    sealed partial class ActionPicker : DropDownButton
     {
         readonly Store store;
         readonly string defaultLabel;
@@ -29,6 +29,7 @@ namespace LiteOptions.SettingsApp
 
         public ActionPicker(Store store, string defaultLabel, bool allowNothing = true)
         {
+            DefaultStyleKey = typeof(DropDownButton); // a subclass would otherwise get the plain Button look (no ▾)
             this.store = store;
             this.defaultLabel = defaultLabel;
             this.allowNothing = allowNothing;
@@ -112,7 +113,7 @@ namespace LiteOptions.SettingsApp
     }
 
     /// <summary>Records a key or shortcut through the engine's keyboard hook, so Win-combos and media keys work too.</summary>
-    sealed class KeyRecorder : StackPanel
+    sealed partial class KeyRecorder : StackPanel
     {
         readonly Store store;
         readonly Border box;
@@ -206,7 +207,7 @@ namespace LiteOptions.SettingsApp
     }
 
     /// <summary>Editor for the three custom kinds of action: a shortcut to send, something to open, or text to type.</summary>
-    sealed class CustomEditor : StackPanel
+    sealed partial class CustomEditor : StackPanel
     {
         readonly Store store;
         string kind;

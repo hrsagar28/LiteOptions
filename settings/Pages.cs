@@ -12,7 +12,7 @@ using Windows.ApplicationModel.DataTransfer;
 
 namespace LiteOptions.SettingsApp
 {
-    abstract class PageBase : StackPanel
+    abstract partial class PageBase : StackPanel
     {
         protected readonly Store store;
         protected bool loading;
@@ -69,7 +69,7 @@ namespace LiteOptions.SettingsApp
 
     // ───────────────────────────── Mouse ─────────────────────────────
 
-    sealed class MousePage : PageBase
+    sealed partial class MousePage : PageBase
     {
         readonly DeviceHero hero;
         readonly SettingCard modeCard, actionCard, dpiCard, speedCard, precisionCard, linesCard, reverseCard;
@@ -287,7 +287,7 @@ namespace LiteOptions.SettingsApp
 
     // ───────────────────────────── Keyboard ─────────────────────────────
 
-    sealed class KeyboardPage : PageBase
+    sealed partial class KeyboardPage : PageBase
     {
         readonly DeviceHero hero;
         readonly TextBlock fnHeader;
@@ -426,7 +426,7 @@ namespace LiteOptions.SettingsApp
 
     // ───────────────────────────── Settings ─────────────────────────────
 
-    sealed class SettingsPage : PageBase
+    sealed partial class SettingsPage : PageBase
     {
         readonly ToggleSwitch startup, paused, notify, popups;
         readonly ComboBox lowBatt;

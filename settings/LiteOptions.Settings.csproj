@@ -26,11 +26,22 @@
     <DebugType>none</DebugType>
     <NoWarn>$(NoWarn);CA1416;CS0649;CS0169;CS0414;CS8981;CsWinRT1028;CsWinRT1030;SYSLIB1054;SYSLIB0050;SYSLIB0051;IL2026;IL2104;IL3050</NoWarn>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <WinAppSdkVersion>2.6.4</WinAppSdkVersion>
+    <!-- drop the unused parts of .NET and of the Windows API wrappers; our own code is kept whole -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.*" />
+    <!-- only the parts the window uses: not the whole SDK, which also ships ~50 MB of AI/ML, search and widget runtimes -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.Base" Version="$(WinAppSdkVersion)" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Runtime" Version="$(WinAppSdkVersion)" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Foundation" Version="$(WinAppSdkVersion)" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.InteractiveExperiences" Version="$(WinAppSdkVersion)" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.DWrite" Version="$(WinAppSdkVersion)" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="$(WinAppSdkVersion)" />
   </ItemGroup>
 
   <!-- shared with the engine: settings model, actions/key names, Win32 interop, the pipe protocol -->

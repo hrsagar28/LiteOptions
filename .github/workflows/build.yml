@@ -52,11 +52,14 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
           foreach ($a in 'x64', 'ARM64') {
-            dotnet build engine/LiteOptions.csproj -c Release --no-incremental "-p:SettingsZip=$pwd/out/settings-$a.zip" -o "out/engine-$a"
+            # .NET Framework runs "any CPU" programs as emulated x64 on ARM PCs, so the ARM64 engine is built as ARM64
+            $plat = if ($a -eq 'ARM64') { 'ARM64' } else { 'AnyCPU' }
+            dotnet build engine/LiteOptions.csproj -c Release --no-incremental "-p:SettingsZip=$pwd/out/settings-$a.zip" "-p:PlatformTarget=$plat" -o "out/engine-$a"
             if ($LASTEXITCODE) { exit 1 }
             Copy-Item "out/engine-$a/LiteOptions.exe" "dist/LiteOptions-$a.exe"
           }
           Get-ChildItem dist, out/*.zip | ForEach-Object { "{0,-28} {1,8:N1} MB" -f $_.Name, ($_.Length / 1MB) } | Tee-Object -FilePath out/sizes.txt
+          foreach ($a in 'x64', 'ARM64') { "{0,-28} {1,8:N1} MB, {2} files" -f "settings-$a (unpacked)", ((Get-ChildItem "out/settings-$a" -Recurse -File | Measure-Object Length -Sum).Sum / 1MB), (Get-ChildItem "out/settings-$a" -Recurse -File).Count | Tee-Object -FilePath out/sizes.txt -Append }
 
       - uses: actions/upload-artifact@v4
         with:
@@ -122,6 +125,7 @@ jobs:
           $selftest = $p.ExitCode
           Say "self-test exit code: $selftest"
           Get-Content (Join-Path $r 'selftest.txt') -ErrorAction SilentlyContinue | ForEach-Object { Say "  $_" }
+          if ($arch -eq 'ARM64' -and -not (Select-String -Path (Join-Path $r 'selftest.txt') -Pattern 'engine \S+ Arm64' -Quiet)) { Say 'FAIL: the engine is not running as native ARM64'; $selftest = 9 }
 
           # 2. the normal way in: start LiteOptions again and the engine opens the window
           Start-Process (Join-Path $dir 'LiteOptions.exe')
