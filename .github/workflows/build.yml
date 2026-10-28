@@ -167,6 +167,7 @@ jobs:
           path: r
       - name: Publish results to the ci-results branch
         run: |
+          mkdir -p r
           rm -rf r/installers
           cd r
           echo "run ${{ github.run_id }} for ${{ github.sha }} (${{ github.ref_name }})" > RUN.txt
