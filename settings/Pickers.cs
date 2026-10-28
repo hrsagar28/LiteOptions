@@ -15,12 +15,14 @@ using Windows.Storage.Pickers;
 namespace LiteOptions.SettingsApp
 {
     /// <summary>The action chooser: a drop-down button whose menu groups the presets, plus custom actions.</summary>
-    sealed partial class ActionPicker : DropDownButton
+    /// <remarks>Wraps a DropDownButton rather than deriving from it: a subclass loses the button's ▾ look.</remarks>
+    sealed partial class ActionPicker : UserControl
     {
         readonly Store store;
         readonly string defaultLabel;
         readonly bool allowNothing;
         readonly TextBlock label;
+        readonly DropDownButton button;
         ActionSpec spec = ActionSpec.Default();
 
         public event Action<ActionSpec> Changed;
@@ -29,18 +31,24 @@ namespace LiteOptions.SettingsApp
 
         public ActionPicker(Store store, string defaultLabel, bool allowNothing = true)
         {
-            DefaultStyleKey = typeof(DropDownButton); // a subclass would otherwise get the plain Button look (no ▾)
             this.store = store;
             this.defaultLabel = defaultLabel;
             this.allowNothing = allowNothing;
+            IsTabStop = false;
             label = new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 250, TextAlignment = TextAlignment.Left };
-            Content = label;
-            MinWidth = 250;
-            HorizontalContentAlignment = HorizontalAlignment.Left;
+            button = new DropDownButton { Content = label, MinWidth = 250, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left };
             var f = new MenuFlyout { Placement = FlyoutPlacementMode.BottomEdgeAlignedLeft };
             f.Opening += (s, e) => Build(f);
-            Flyout = f;
+            button.Flyout = f;
+            Content = button;
             Value = ActionSpec.Default();
+        }
+
+        /// <summary>Open the menu (used by the screenshot tour).</summary>
+        public FlyoutBase OpenMenu()
+        {
+            button.Flyout.ShowAt(button);
+            return button.Flyout;
         }
 
         public ActionSpec Value

@@ -328,10 +328,7 @@ namespace LiteOptions.SettingsApp
         /// <summary>For screenshots: open the first action menu on the current page.</summary>
         internal FlyoutBase OpenFirstMenu()
         {
-            var picker = FindFirst<ActionPicker>(current);
-            if (picker?.Flyout == null) return null;
-            picker.Flyout.ShowAt(picker);
-            return picker.Flyout;
+            return FindFirst<ActionPicker>(current)?.OpenMenu();
         }
 
         static T FindFirst<T>(DependencyObject parent) where T : DependencyObject

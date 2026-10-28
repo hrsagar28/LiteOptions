@@ -1,17 +1,20 @@
-LiteOptions 1.2
+LiteOptions 2.0
 A small, local stand-in for Logi Options+ for the Pebble Mouse 2 M350s and the K380 keyboard.
 
 ------------------------------------------------------------
 INSTALL OR UPDATE
 ------------------------------------------------------------
-Double-click LiteOptions.exe (or LiteOptions-1.2.exe) and click Install / Update.
+Download the installer from github.com/hrsagar28/LiteOptions/releases:
+  - LiteOptions-ARM64.exe for Surface Laptop and other Snapdragon PCs
+  - LiteOptions-x64.exe for Intel or AMD PCs
+Double-click it and click Install / Update.
   - It installs for your Windows account only, so no administrator prompt.
   - It goes into %LOCALAPPDATA%\Programs\LiteOptions, gets a Start menu entry and is listed
     under Settings > Apps > Installed apps.
   - If an older version is running, it is closed and replaced. Your settings are kept.
   - The downloaded file isn't needed afterwards; you can delete it.
 
-Future updates work the same way: download the new exe, double-click it, click Update.
+Future updates work the same way: download the new installer, double-click it, click Update.
 
 If Windows SmartScreen says "Windows protected your PC": click "More info" > "Run anyway".
 This happens because the app isn't code-signed. It isn't a virus warning.
@@ -61,8 +64,11 @@ The tray icon shows a small battery gauge for whichever device is lowest: green,
 
 Click the dots on the mouse or keyboard picture to jump to those settings.
 
-The window follows Windows' light or dark mode and stays sharp when moved between screens with
-different scaling. The tray icon menu has quick toggles for F1-F12 first and Pause remapping.
+The settings window (new in 2.0) uses Windows 11's own controls: Mica background, the
+Settings-app sidebar, menus and dialogs. It follows light or dark mode and stays sharp on every
+screen. It only runs while it's open; close it and its memory is freed. The part that does the
+work stays in the tray. If the new window ever can't start, the classic window opens instead
+(also reachable from Settings > Troubleshooting). The tray icon menu has quick toggles for F1-F12 first and Pause remapping.
 Settings > Run setup repeats the three first-run choices.
 
 ------------------------------------------------------------
@@ -74,6 +80,9 @@ GOOD TO KNOW
 - Firmware updates only come through Logi Options+. They are rare and optional. If you ever want
   one, install Options+, let it update, then uninstall it. The firmware stays on the device.
 - No account, no internet access, no telemetry, no background service. It runs natively on ARM64.
+- Sizes: the tray part uses about 25 MB of memory. The settings window adds about 60 MB only
+  while it's open. Installed size is about 130 MB, mostly Microsoft's WinUI and .NET files that
+  the settings window carries so nothing else needs installing.
 
 ------------------------------------------------------------
 IF SOMETHING DOESN'T WORK
