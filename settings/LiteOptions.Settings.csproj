@@ -55,5 +55,8 @@
   <ItemGroup>
     <Content Include="..\assets\app.ico" Link="app.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\assets\logo.png" Link="logo.png" CopyToOutputDirectory="PreserveNewest" />
+    <!-- photos of the Pebble Mouse 2 and K380 shown on the Mouse and Keyboard pages -->
+    <Content Remove="Assets\**" />
+    <Content Include="Assets\*.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
