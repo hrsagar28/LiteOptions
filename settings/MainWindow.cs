@@ -165,7 +165,7 @@ namespace LiteOptions.SettingsApp
             profileBar.Visibility = p.UsesProfiles ? Visibility.Visible : Visibility.Collapsed;
             scroller.ChangeView(null, 0, null, true);
             var item = tag == "keys" ? navKeys : tag == "settings" ? navSettings : navMouse;
-            if (nav.SelectedItem != item) nav.SelectedItem = item;
+            if (!ReferenceEquals(nav.SelectedItem, item)) nav.SelectedItem = item;
             if (p == SettingsPage) _ = store.RefreshAsync(); // Options+ status, startup state
         }
 

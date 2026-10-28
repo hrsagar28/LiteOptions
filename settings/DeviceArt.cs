@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using LiteOptions.Ipc;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
@@ -39,7 +38,7 @@ namespace LiteOptions.SettingsApp
             double w = mouse ? MouseW : KeysW, h = mouse ? MouseH : KeysH;
             art = new Grid { Width = w, Height = h, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(mouse ? 24 : 0, 0, mouse ? 24 : 0, 0) };
             var photo = new Image { Stretch = Stretch.Fill, Width = w, Height = h };
-            try { photo.Source = new BitmapImage(new Uri(Path.Combine(AppContext.BaseDirectory, "Assets", mouse ? "mouse.png" : "keyboard.png"))); } catch { }
+            try { photo.Source = new BitmapImage(new Uri(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", mouse ? "mouse.png" : "keyboard.png"))); } catch { }
             art.Children.Add(photo);
             var spots = new Canvas { Width = w, Height = h };
             if (mouse)
