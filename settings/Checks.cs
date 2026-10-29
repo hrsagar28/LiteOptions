@@ -77,9 +77,9 @@ namespace LiteOptions.SettingsApp
                 w.ResizeTo(760, 640); await Task.Delay(800);
                 bool folded = w.IsNarrow;
                 w.ResizeTo(1200, 760); await Task.Delay(800);
-                bool back = !w.IsNarrow;
+                bool back = !w.IsNarrow && w.PaneOpen;
                 w.AppWindow.Resize(size); await Task.Delay(500);
-                if (!folded || !back) { Finish(false, $"menu folding: folded when narrow={folded}, back when wide={back}"); return; }
+                if (!folded || !back) { Finish(false, $"menu folding: folded when narrow={folded}, back in full when wide={back}"); return; }
                 log.Add("menu: folds behind the menu button when narrow, back on the left when wide");
 
                 string dir = string.IsNullOrEmpty(Entry.SelfTestFile) ? null : Path.GetDirectoryName(Path.GetFullPath(Entry.SelfTestFile));

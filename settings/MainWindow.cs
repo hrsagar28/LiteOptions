@@ -210,6 +210,8 @@ namespace LiteOptions.SettingsApp
             nav.MenuItems.Add(navApps);
             nav.MenuItems.Add(navAlerts);
             nav.FooterMenuItems.Add(navSettings);
+            // on a wide window the menu always shows in full (otherwise, after the window has been narrow, it can come back as icons only)
+            nav.PaneClosing += (s, e) => { if (!narrow) e.Cancel = true; };
             nav.SelectionChanged += (s, e) =>
             {
                 ShowPage((e.SelectedItem as NavigationViewItem)?.Tag as string);
@@ -495,6 +497,8 @@ namespace LiteOptions.SettingsApp
             narrow = now;
             nav.PaneDisplayMode = narrow ? NavigationViewPaneDisplayMode.LeftMinimal : NavigationViewPaneDisplayMode.Left;
             nav.IsPaneOpen = !narrow;
+            // the menu settles into its new mode a moment later and may close itself; open it again then
+            if (!narrow) DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => { if (!narrow) nav.IsPaneOpen = true; });
             paneButton.Visibility = narrow ? Visibility.Visible : Visibility.Collapsed;
             logo.Margin = new Thickness(narrow ? 8 : 16, 0, 12, 0);
             DispatcherQueue.TryEnqueue(UpdateDragRegions);
@@ -557,6 +561,8 @@ namespace LiteOptions.SettingsApp
         }
 
         internal bool IsNarrow => narrow;
+
+        internal bool PaneOpen => nav.IsPaneOpen;
 
         /// <summary>For screenshots: open or close the menu while narrow.</summary>
         internal void SetPaneOpen(bool open) { if (narrow) nav.IsPaneOpen = open; }
