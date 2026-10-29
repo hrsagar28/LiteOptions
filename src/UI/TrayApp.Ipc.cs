@@ -66,6 +66,7 @@ namespace LiteOptions.UI
             DpiMin = d.Dpi?.Min ?? 0, DpiMax = d.Dpi?.Max ?? 0, DpiStep = d.Dpi?.Step ?? 0, DpiCurrent = d.Dpi?.Current ?? 0, DpiDefault = d.Dpi?.Default ?? 0,
             FnSupported = d.FnSupported, FnMedia = d.FnMedia == null ? -1 : d.FnMedia.Value ? 1 : 0, LastError = d.LastError ?? "",
             CurrentHost = d.Hosts?.Current ?? -1,
+            DisableCaps = d.DisableCaps, DisabledKeys = d.DisabledKeys,
             Hosts = d.Hosts?.Hosts.Select(h => new HostDto { Number = h.Index + 1, Paired = h.Paired, Unknown = h.Unknown, Name = h.Name ?? "" }).ToList()
         }).ToList();
 
@@ -170,6 +171,10 @@ namespace LiteOptions.UI
 
                 case "classic":
                     ShowClassicWindow();
+                    return ok;
+
+                case "quit":
+                    ui.Post(_ => ExitThread(), null);
                     return ok;
             }
             return new IpcMessage { Error = "unknown command " + m.Cmd };

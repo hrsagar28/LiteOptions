@@ -130,10 +130,10 @@ namespace LiteOptions.SettingsApp
                 DpiMin = 400, DpiMax = 4000, DpiStep = 100, DpiCurrent = 1000, DpiDefault = 1000,
                 CurrentHost = 2, Hosts = new List<HostDto> { new HostDto { Number = 1, Paired = true, Name = "Pixel 8" }, new HostDto { Number = 2, Paired = true, Name = "DESKTOP-OFFICE" }, new HostDto { Number = 3, Paired = true, Name = "WORK-LAPTOP" } } },
             new DeviceDto { Key = "demo-kb", Name = "Keyboard K380", Kind = "Keyboard", Connection = "Bluetooth", Pid = 0xB342, Online = true,
-                HasBattery = true, BatteryPercent = -1, BatteryLevel = "Good", FnSupported = true, FnMedia = 0,
+                HasBattery = true, BatteryPercent = -1, BatteryLevel = "Good", FnSupported = true, FnMedia = 0, DisableCaps = 0x1D, DisabledKeys = 0x10,
                 CurrentHost = 1, Hosts = new List<HostDto> { new HostDto { Number = 1 }, new HostDto { Number = 2, Paired = true, Name = "WORK-LAPTOP" }, new HostDto { Number = 3, Paired = true, Name = "iPhone" } } },
         };
-        readonly SystemDto system = new SystemDto { Version = "2.1.0", Installed = true, PointerSpeed = 10, Precision = true, WheelLines = 3, Startup = true, ReverseScroll = 0, Architecture = RuntimeInformation.ProcessArchitecture.ToString() };
+        readonly SystemDto system = new SystemDto { Version = "2.2.0", Installed = true, PointerSpeed = 10, Precision = true, WheelLines = 3, Startup = true, ReverseScroll = 0, Architecture = RuntimeInformation.ProcessArchitecture.ToString() };
 
         public bool Connected { get; private set; }
         public event Action<bool> ConnectionChanged;
@@ -223,7 +223,25 @@ namespace LiteOptions.SettingsApp
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] public static extern bool QueryFullProcessImageName(IntPtr process, uint flags, StringBuilder name, ref uint size);
         [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr h);
 
+        [DllImport("dwmapi.dll")] public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+        [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT p);
+        [DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(POINT p, uint flags);
+        [DllImport("shcore.dll")] static extern int GetDpiForMonitor(IntPtr monitor, int type, out uint dpiX, out uint dpiY);
+
+        /// <summary>The DPI of the display at a point on the screen (96 if Windows won't say).</summary>
+        public static uint DpiAt(int x, int y)
+        {
+            try
+            {
+                var m = MonitorFromPoint(new POINT { X = x, Y = y }, 2 /* MONITOR_DEFAULTTONEAREST */);
+                if (m != IntPtr.Zero && GetDpiForMonitor(m, 0 /* MDT_EFFECTIVE_DPI */, out uint dx, out _) == 0 && dx > 0) return dx;
+            }
+            catch { }
+            return 96;
+        }
+
         [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
+        [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
 
         [StructLayout(LayoutKind.Sequential)]
         public struct BITMAPINFOHEADER

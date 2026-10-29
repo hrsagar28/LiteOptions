@@ -17,6 +17,12 @@ namespace LiteOptions.SettingsApp
         protected readonly Store store;
         protected bool loading;
 
+        /// <summary>Settings the title-bar search can find: a title (null = the card's own), words to match, and where to jump.</summary>
+        public readonly List<(string title, string words, FrameworkElement target)> Searchable = new List<(string, string, FrameworkElement)>();
+
+        /// <summary>Set by the window: go to another page ("mouse", "keys", "apps", "alerts", "settings").</summary>
+        public Action<string> Navigate;
+
         protected PageBase(Store store)
         {
             this.store = store;
@@ -33,6 +39,10 @@ namespace LiteOptions.SettingsApp
 
         protected T Add<T>(T e) where T : UIElement { Children.Add(e); return e; }
 
+        protected T Find<T>(T e, string words, string title = null) where T : FrameworkElement { Searchable.Add((title, words, e)); return e; }
+
+        protected SettingsGroup Group() => Add(new SettingsGroup());
+
         protected TextBlock Section(string text)
         {
             var h = Ui.Header(text);
@@ -40,15 +50,39 @@ namespace LiteOptions.SettingsApp
             return h;
         }
 
+        /// <summary>A section heading with something on its right: a short note or a button.</summary>
+        protected Grid Section(string text, UIElement right)
+        {
+            var g = new Grid { ColumnSpacing = 12 };
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var h = Ui.Header(text);
+            g.Children.Add(h);
+            if (right is FrameworkElement fe)
+            {
+                fe.HorizontalAlignment = HorizontalAlignment.Right;
+                fe.VerticalAlignment = VerticalAlignment.Bottom;
+                fe.Margin = new Thickness(0, 0, 0, fe is TextBlock ? 9 : 4);
+                if (fe is TextBlock tb) { tb.TextAlignment = TextAlignment.Right; tb.TextWrapping = TextWrapping.Wrap; }
+            }
+            Grid.SetColumn(right, 1);
+            g.Children.Add(right);
+            Children.Add(g);
+            return g;
+        }
+
         protected Profile Current => store.Current;
 
         protected static void Show(UIElement e, bool on) => e.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
 
-        protected static void Jump(FrameworkElement target)
+        public static void Jump(FrameworkElement target)
         {
+            if (target == null) return;
             target.StartBringIntoView(new BringIntoViewOptions { VerticalAlignmentRatio = 0.0, VerticalOffset = -16, AnimationDesired = true });
             if (target is SettingCard c) c.Flash();
         }
+
+        protected static TextBlock Note(string text) => new TextBlock { Text = text, Style = Ui.Style("Secondary") };
     }
 
     /// <summary>Calls an action once things have been quiet for a moment (slider drags, typing).</summary>
@@ -72,12 +106,14 @@ namespace LiteOptions.SettingsApp
     sealed partial class MousePage : PageBase
     {
         readonly DeviceHero hero;
-        readonly SettingCard modeCard, actionCard, dpiCard, speedCard, precisionCard, linesCard, reverseCard, smoothCard, hostsCard;
-        readonly SettingCard[] gestureCards;
-        readonly ComboBox mode;
+        readonly Segmented mode;
+        readonly SettingCard modeCard, actionCard, dpiCard, speedCard, precisionCard, linesCard, smoothCard, reverseCard;
+        readonly Border gestureBox;
         readonly ActionPicker middleAction, gClick, gUp, gDown, gLeft, gRight;
         readonly NoteCard appNote;
-        readonly TextBlock pointerHeader, scrollHeader, hostsHeader;
+        readonly TextBlock pointerHeader, scrollHeader;
+        readonly SettingsGroup pointerGroup, scrollGroup;
+        readonly Grid hostsHeader, channels;
         readonly Slider dpi, speed, lines;
         readonly TextBlock dpiValue, speedValue, linesValue;
         readonly Button dpiReset;
@@ -92,41 +128,47 @@ namespace LiteOptions.SettingsApp
             hero = Add(new DeviceHero(true));
             hero.HotspotClicked += JumpTo;
 
-            Section("Middle button");
-            mode = new ComboBox { MinWidth = 200 };
-            mode.SelectionChanged += (s, e) =>
+            Section("Buttons");
+            var buttons = Group();
+            mode = new Segmented("Pressing the scroll wheel", "Normal click", "One action", "Gestures");
+            mode.SelectionChanged += i =>
             {
-                if (loading || mode.SelectedIndex < 0) return;
-                Current.MiddleMode = modes[mode.SelectedIndex];
+                if (loading || i < 0 || i >= modes.Count) return;
+                Current.MiddleMode = modes[i];
                 UpdateMiddle();
                 store.Save();
             };
-            modeCard = Add(new SettingCard(Glyph.Mouse, "Pressing the scroll wheel", "", mode));
+            modeCard = Find(buttons.Add(new SettingCard(Glyph.Mouse, "Pressing the scroll wheel", "", mode)), "middle button wheel click gestures scroll wheel press");
 
             middleAction = Picker("Middle click", a => Current.MiddleAction = a);
-            actionCard = Add(new SettingCard(null, "Action", "Runs each time you press the wheel", middleAction).Indent());
+            actionCard = buttons.Add(new SettingCard(null, "Action", "Runs each time you press the wheel", middleAction).Indent());
 
-            gClick = Picker("Middle click", a => Current.GestureClick = a);
-            gUp = Picker("Nothing", a => Current.GestureUp = a, false);
-            gDown = Picker("Nothing", a => Current.GestureDown = a, false);
-            gLeft = Picker("Nothing", a => Current.GestureLeft = a, false);
-            gRight = Picker("Nothing", a => Current.GestureRight = a, false);
-            gestureCards = new[]
+            gClick = Tile("Middle click", a => Current.GestureClick = a, "Click", "", true, true);
+            gUp = Tile("Nothing", a => Current.GestureUp = a, "Up", Glyph.Up, false, false);
+            gDown = Tile("Nothing", a => Current.GestureDown = a, "Down", Glyph.Down, false, false);
+            gLeft = Tile("Nothing", a => Current.GestureLeft = a, "Left", Glyph.Left, false, false);
+            gRight = Tile("Nothing", a => Current.GestureRight = a, "Right", Glyph.Right, false, false);
+            var cross = new Grid { ColumnSpacing = 8, RowSpacing = 8, MaxWidth = 660, HorizontalAlignment = HorizontalAlignment.Left };
+            for (int i = 0; i < 3; i++) cross.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            for (int i = 0; i < 3; i++) cross.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            void place(UIElement e, int row, int col) { Grid.SetRow(e, row); Grid.SetColumn(e, col); cross.Children.Add(e); }
+            place(gUp, 0, 1); place(gLeft, 1, 0); place(gClick, 1, 1); place(gRight, 1, 2); place(gDown, 2, 1);
+            gestureBox = buttons.Add(new Border
             {
-                Add(new SettingCard(Glyph.Touch, "Click without moving", null, gClick).Indent()),
-                Add(new SettingCard(Glyph.Up, "Hold and move up", null, gUp).Indent()),
-                Add(new SettingCard(Glyph.Down, "Hold and move down", null, gDown).Indent()),
-                Add(new SettingCard(Glyph.Left, "Hold and move left", null, gLeft).Indent()),
-                Add(new SettingCard(Glyph.Right, "Hold and move right", null, gRight).Indent()),
-            };
+                Padding = new Thickness(56, 14, 16, 16),
+                Background = Ui.Brush("SubtleFillColorTertiaryBrush"),
+                Child = Ui.Column(10, cross, Note("Pick a tile to change it. Each gesture shows a pop-up so you know it worked.")),
+            });
+            Find(gestureBox, "gestures up down left right task view desktop", "Middle-button gestures");
 
-            appNote = Add(new NoteCard("Pointer and scrolling settings are shared by every app. Switch to All applications to change them."));
+            appNote = Add(new NoteCard("Pointer and scrolling settings are shared by every app. Switch to All apps to change them."));
             appNote.Margin = new Thickness(0, 22, 0, 0);
 
             pointerHeader = Section("Pointer");
-            dpi = new Slider { Width = 220, VerticalAlignment = VerticalAlignment.Center, SnapsTo = SliderSnapsTo.StepValues, IsThumbToolTipEnabled = true };
+            pointerGroup = Group();
+            dpi = new Slider { Width = 200, VerticalAlignment = VerticalAlignment.Center, SnapsTo = SliderSnapsTo.StepValues, IsThumbToolTipEnabled = true };
             dpi.ThumbToolTipValueConverter = new FuncConverter(v => (int)v + " DPI");
-            dpiValue = Value(84);
+            dpiValue = Value(80);
             dpiReset = Ui.IconButton(Glyph.Refresh, "Back to the mouse's default", (s, e) =>
             {
                 var m = store.Mouse;
@@ -135,6 +177,7 @@ namespace LiteOptions.SettingsApp
             dpi.ValueChanged += (s, e) =>
             {
                 dpiValue.Text = (int)dpi.Value + " DPI";
+                hero.SetCallout("pointer", dpiValue.Text);
                 if (loading) return;
                 int v = (int)dpi.Value;
                 dpiSend.Run(() =>
@@ -143,10 +186,10 @@ namespace LiteOptions.SettingsApp
                     _ = store.Send("setDpi", v);
                 });
             };
-            dpiCard = Add(new SettingCard(Glyph.Speed, "Mouse sensitivity", "", Ui.Row(10, dpi, dpiValue, dpiReset)));
+            dpiCard = Find(pointerGroup.Add(new SettingCard(Glyph.Speed, "Mouse sensitivity", "", Ui.Row(10, dpi, dpiValue, dpiReset))), "dpi sensitivity speed sensor");
 
-            speed = new Slider { Minimum = 1, Maximum = 20, StepFrequency = 1, Width = 220, VerticalAlignment = VerticalAlignment.Center };
-            speedValue = Value(84);
+            speed = new Slider { Minimum = 1, Maximum = 20, StepFrequency = 1, Width = 200, VerticalAlignment = VerticalAlignment.Center };
+            speedValue = Value(80);
             speed.ValueChanged += (s, e) =>
             {
                 speedValue.Text = ((int)speed.Value).ToString();
@@ -154,34 +197,38 @@ namespace LiteOptions.SettingsApp
                 int v = (int)speed.Value;
                 speedSend.Run(() => _ = store.Send("setPointerSpeed", v));
             };
-            speedCard = Add(new SettingCard(Glyph.Touch, "Windows pointer speed", "Also changes the touchpad. Windows' default is 10.", Ui.Row(10, speed, speedValue, Spacer())));
+            speedCard = Find(pointerGroup.Add(new SettingCard(Glyph.Touch, "Windows pointer speed", "Also changes the touchpad. Windows' default is 10.", Ui.Row(10, speed, speedValue, Spacer()))), "pointer speed cursor touchpad");
 
             precision = Ui.Toggle();
             precision.Toggled += (s, e) => { if (!loading) _ = store.Send("setPrecision", on: precision.IsOn); };
-            precisionCard = Add(new SettingCard(null, "Enhance pointer precision", "Faster hand movements carry the pointer further", precision));
+            precisionCard = Find(pointerGroup.Add(new SettingCard(null, "Enhance pointer precision", "Faster hand movements carry the pointer further", precision).Indent()), "enhance pointer precision acceleration");
 
             scrollHeader = Section("Scrolling");
-            lines = new Slider { Minimum = 1, Maximum = 20, StepFrequency = 1, Width = 220, VerticalAlignment = VerticalAlignment.Center };
-            linesValue = Value(84);
+            scrollGroup = Group();
+            lines = new Slider { Minimum = 1, Maximum = 20, StepFrequency = 1, Width = 200, VerticalAlignment = VerticalAlignment.Center };
+            linesValue = Value(80);
             lines.ValueChanged += (s, e) =>
             {
                 int v = (int)lines.Value;
                 linesValue.Text = v + (v == 1 ? " line" : " lines");
+                UpdateScrollCallout();
                 if (loading) return;
                 linesSend.Run(() => _ = store.Send("setWheelLines", v));
             };
-            linesCard = Add(new SettingCard(Glyph.Scroll, "Scroll distance", "Lines moved by one click of the wheel. Windows' default is 3.", Ui.Row(10, lines, linesValue, Spacer())));
+            linesCard = Find(scrollGroup.Add(new SettingCard(Glyph.Scroll, "Scroll distance", "Lines moved by one click of the wheel. Windows' default is 3.", Ui.Row(10, lines, linesValue, Spacer()))), "scroll distance lines wheel");
+
             smooth = Ui.Toggle();
-            smooth.Toggled += (s, e) => { if (!loading) { store.Settings.SmoothScroll = smooth.IsOn; store.Save(); } };
-            smoothCard = Add(new SettingCard(null, "Smooth scrolling",
-                "Each click of the wheel glides instead of jumping. Works in browsers, Office and most apps; if an older app stops scrolling, switch this off.", smooth).Indent());
+            smooth.Toggled += (s, e) => { UpdateScrollCallout(); if (!loading) { store.Settings.SmoothScroll = smooth.IsOn; store.Save(); } };
+            smoothCard = Find(scrollGroup.Add(new SettingCard(null, "Smooth scrolling",
+                "Each click of the wheel glides instead of jumping. Works in browsers, Office and most apps; if an older app stops scrolling, switch this off.", smooth).Indent()), "smooth scrolling glide wheel");
 
             reverse = Ui.Toggle();
             reverse.Toggled += (s, e) => { if (!loading) ToggleReverse(); };
-            reverseCard = Add(new SettingCard(Glyph.Swap, "Reverse scroll direction", "This mouse only. Windows asks for permission once; then switch the mouse off and on.", reverse));
+            reverseCard = Find(scrollGroup.Add(new SettingCard(Glyph.Swap, "Reverse scroll direction", "This mouse only. Windows asks for permission once; then switch the mouse off and on.", reverse)), "reverse scroll direction natural");
 
-            hostsHeader = Section("Easy-Switch");
-            hostsCard = Add(EasySwitch.Card(mouse: true));
+            hostsHeader = Section("Easy-Switch", Note("The button underneath the mouse changes channel"));
+            channels = Add(Channels.Make());
+            Find(channels, "easy-switch channels paired computers phone bluetooth", "Easy-Switch channels (mouse)");
         }
 
         static TextBlock Value(double width) => new TextBlock { Width = width, VerticalAlignment = VerticalAlignment.Center, Style = Ui.Style("BodyStrongTextBlockStyle") };
@@ -194,26 +241,31 @@ namespace LiteOptions.SettingsApp
             return p;
         }
 
+        ActionPicker Tile(string defaultLabel, Action<ActionSpec> set, string direction, string glyph, bool accent, bool allowNothing)
+        {
+            var p = ActionPicker.Tile(store, defaultLabel, allowNothing, direction, glyph, accent);
+            p.Changed += a => { if (loading) return; set(a); store.Save(); };
+            return p;
+        }
+
         public override void LoadSettings()
         {
             loading = true;
             var p = Current;
             bool global = p.IsGlobal;
             modes = global ? new List<string> { "default", "action", "gestures" } : new List<string> { "inherit", "default", "action", "gestures" };
-            mode.Items.Clear();
-            if (!global) mode.Items.Add("Same as all apps");
-            mode.Items.Add("Normal click");
-            mode.Items.Add("One action");
-            mode.Items.Add("Gestures");
+            if (global) mode.SetOptions("Normal click", "One action", "Gestures");
+            else mode.SetOptions("Same as all apps", "Normal click", "One action", "Gestures");
             mode.SelectedIndex = Math.Max(0, modes.IndexOf(p.MiddleMode));
             middleAction.Value = p.MiddleAction;
             gClick.Value = p.GestureClick; gUp.Value = p.GestureUp; gDown.Value = p.GestureDown; gLeft.Value = p.GestureLeft; gRight.Value = p.GestureRight;
             UpdateMiddle();
 
-            foreach (var e in new UIElement[] { pointerHeader, dpiCard, speedCard, precisionCard, scrollHeader, linesCard, reverseCard, smoothCard }) Show(e, global);
+            foreach (var e in new UIElement[] { pointerHeader, pointerGroup, scrollHeader, scrollGroup }) Show(e, global);
             smooth.IsOn = store.Settings.SmoothScroll;
             appNote.Shown = !global;
             loading = false;
+            UpdateScrollCallout();
             LoadDevices();
         }
 
@@ -221,21 +273,27 @@ namespace LiteOptions.SettingsApp
         {
             string m = Current.MiddleMode ?? "default";
             actionCard.Shown = m == "action";
-            foreach (var c in gestureCards) c.Shown = m == "gestures";
+            gestureBox.Visibility = m == "gestures" ? Visibility.Visible : Visibility.Collapsed;
             modeCard.Description =
-                m == "inherit" ? "Uses the All applications setting" :
+                m == "inherit" ? "Uses the All apps setting" :
                 m == "default" ? "Works as a normal middle click" :
                 m == "action" ? "Does one thing of your choice" :
-                "Hold the wheel down, nudge the mouse in a direction, then let go. The pointer stays still while you hold it.";
+                "Hold the wheel, nudge the mouse in a direction, let go. The pointer stays still while you hold it.";
+            var eff = m == "inherit" ? store.Settings.Global.MiddleMode : m;
+            hero.SetCallout("middle", eff == "gestures" ? "Gestures" : eff == "action" ? Presets.Describe(m == "inherit" ? store.Settings.Global.MiddleAction : Current.MiddleAction, "Middle click") : "Normal click");
         }
+
+        void UpdateScrollCallout() =>
+            hero.SetCallout("scroll", (smooth.IsOn ? "Smooth · " : "") + (int)lines.Value + ((int)lines.Value == 1 ? " line" : " lines"));
 
         public override void LoadDevices()
         {
             var m = store.Mouse;
             hero.Fill(m, "No mouse found", "Turn the mouse on, or pair it in Settings › Bluetooth & devices. Button remapping works either way.", store.IsLow(m));
-            EasySwitch.Fill(hostsCard, m);
-            if (!Current.IsGlobal) hostsCard.Shown = false;
-            Show(hostsHeader, hostsCard.Shown);
+            Channels.Fill(channels, m, true);
+            bool hosts = Current.IsGlobal && channels.Children.Count > 0;
+            Show(channels, hosts);
+            Show(hostsHeader, hosts);
             loading = true;
             if (m != null && m.DpiMax > m.DpiMin)
             {
@@ -250,7 +308,7 @@ namespace LiteOptions.SettingsApp
                 want = Math.Max(m.DpiMin, Math.Min(m.DpiMax, m.DpiMin + (int)Math.Round((want - m.DpiMin) / (double)step) * step));
                 if (!dpiSend.Waiting) dpi.Value = want;
                 dpiValue.Text = (int)dpi.Value + " DPI";
-                dpiCard.Description = $"{m.DpiMin}–{m.DpiMax} DPI, stored on the mouse itself (default {m.DpiDefault}). Higher moves the pointer further.";
+                dpiCard.Description = $"Saved on the mouse itself · {m.DpiMin}–{m.DpiMax} DPI (default {m.DpiDefault})";
             }
             else
             {
@@ -258,6 +316,7 @@ namespace LiteOptions.SettingsApp
                 dpiValue.Text = store.Settings.MouseDpi > 0 ? store.Settings.MouseDpi + " DPI" : "—";
                 dpiCard.Description = m == null ? "Turn the mouse on to change its sensitivity" : "This mouse didn't report an adjustable sensor";
             }
+            hero.SetCallout("pointer", dpiValue.Text);
             loading = false;
         }
 
@@ -273,6 +332,7 @@ namespace LiteOptions.SettingsApp
             linesValue.Text = lv + (lv == 1 ? " line" : " lines");
             reverse.IsOn = s.ReverseScroll == 1;
             loading = false;
+            UpdateScrollCallout();
         }
 
         async void ToggleReverse()
@@ -293,8 +353,10 @@ namespace LiteOptions.SettingsApp
 
         public override void JumpTo(string id)
         {
+            bool global = Current.IsGlobal;
             if (id == "middle") Jump(modeCard);
-            else Jump(dpiCard.Visibility == Visibility.Visible ? dpiCard : modeCard);
+            else if (id == "scroll") Jump(global ? linesCard : modeCard);
+            else Jump(global ? dpiCard : modeCard);
         }
     }
 
@@ -304,11 +366,12 @@ namespace LiteOptions.SettingsApp
     {
         readonly DeviceHero hero;
         readonly TextBlock fnHeader;
-        readonly SettingCard fnCard, remapCard, hostsCard;
-        readonly TextBlock hostsHeader;
-        readonly NoteCard fnNote, appNote;
-        readonly ComboBox fn;
-        readonly StackPanel list;
+        readonly SettingsGroup fnGroup, remapGroup;
+        readonly SettingCard fnCard;
+        readonly Segmented fn;
+        readonly NoteCard appNote;
+        readonly Grid offHeader, remapHeader, hostsHeader, channels;
+        readonly KeysOff keysOff;
 
         public override string Title => "Keyboard";
 
@@ -318,27 +381,40 @@ namespace LiteOptions.SettingsApp
             hero.HotspotClicked += JumpTo;
 
             fnHeader = Section("Top row");
-            fn = new ComboBox { MinWidth = 200 };
-            foreach (var t in new[] { "Media keys", "F1–F12", "Leave as is" }) fn.Items.Add(t);
-            fn.SelectionChanged += async (s, e) =>
+            fnGroup = Group();
+            fn = new Segmented("What the top row does", "Media keys", "F1–F12", "Leave as is");
+            fn.SelectionChanged += async i =>
             {
-                if (loading || fn.SelectedIndex < 0) return;
-                string m = fn.SelectedIndex == 0 ? "media" : fn.SelectedIndex == 1 ? "standard" : "unchanged";
+                if (loading || i < 0) return;
+                string m = i == 0 ? "media" : i == 1 ? "standard" : "unchanged";
                 store.Settings.FnMode = m;
+                UpdateTopRow();
                 await store.Send("setFnMode", text: m);
                 await store.RefreshAsync();
             };
-            fnCard = Add(new SettingCard(Glyph.Keyboard, "What the top row does", "Without holding Fn. The other set is always one Fn press away.", fn));
-            fnNote = Add(new NoteCard(""));
-            appNote = Add(new NoteCard("The top-row setting is shared by every app. Switch to All applications to change it."));
+            fnCard = Find(fnGroup.Add(new SettingCard(Glyph.Keyboard, "What the top row does", "", fn)), "top row media keys f1 f12 function keys fn");
 
-            Section("Key remapping");
-            remapCard = Add(new SettingCard(Glyph.Edit, "Remapped keys", "", Ui.Button("Add key", Glyph.Add, accent: true, click: (s, e) => AddKey())));
-            list = Add(new StackPanel { Spacing = 4 });
-            Add(new NoteCard("Tip: to change a K380 media key, click Add key and press it exactly as you normally would."));
+            appNote = Add(new NoteCard("The top row and switched-off keys are shared by every app. Switch to All apps to change them."));
+            appNote.Margin = new Thickness(0, 22, 0, 0);
 
-            hostsHeader = Section("Easy-Switch");
-            hostsCard = Add(EasySwitch.Card(mouse: false));
+            offHeader = Section("Turn off keys", Note("Switched off inside the keyboard. The laptop's own keys keep working."));
+            keysOff = Add(new KeysOff());
+            keysOff.Changed += mask =>
+            {
+                store.Settings.DisabledKeys = mask;
+                store.Save();
+                hero.SetCallout("keysoff", keysOff.Summary(mask));
+            };
+            Find(keysOff, "turn off disable keys caps lock insert windows key scroll lock", "Turn off keys");
+
+            var add = Ui.Button("Add key", Glyph.Add, accent: true, click: (s, e) => AddKey());
+            remapHeader = Section("Remapped keys", add);
+            remapGroup = Group();
+            Find(remapHeader, "remap keys shortcut change key add key", "Remapped keys");
+
+            hostsHeader = Section("Easy-Switch", Note("The F1, F2 and F3 keys change channel"));
+            channels = Add(Channels.Make());
+            Find(channels, "easy-switch channels paired computers phone bluetooth", "Easy-Switch channels (keyboard)");
         }
 
         public override void LoadSettings()
@@ -346,11 +422,7 @@ namespace LiteOptions.SettingsApp
             loading = true;
             var p = Current;
             bool global = p.IsGlobal;
-            Show(fnHeader, global); fnCard.Shown = global; fnNote.Shown = global; appNote.Shown = !global;
-            remapCard.Title = global ? "Remapped keys" : "Remapped keys in " + p.App;
-            remapCard.Description = global
-                ? "Apply in every app, and to the laptop's own keyboard too. The K380's Easy-Switch keys and Fn work inside the keyboard and can't be changed."
-                : "Used only while " + p.App + " is in front, on top of the All applications list. Choose \"Leave the key as it is\" to switch a global remap off here.";
+            Show(fnHeader, global); Show(fnGroup, global); appNote.Shown = !global;
             string m = store.Settings.FnMode;
             fn.SelectedIndex = m == "media" ? 0 : m == "standard" ? 1 : 2;
             loading = false;
@@ -360,27 +432,40 @@ namespace LiteOptions.SettingsApp
 
         void RefreshList()
         {
-            list.Children.Clear();
-            var keys = Current.Keys.OrderBy(k => k.Vk).ThenBy(k => k.Mods).ToList();
+            remapGroup.Clear();
+            var p = Current;
+            var keys = p.Keys.OrderBy(k => k.Vk).ThenBy(k => k.Mods).ToList();
             if (keys.Count == 0)
             {
-                var none = new Border { Style = Ui.Style("Card"), MinHeight = 0, Padding = new Thickness(56, 14, 16, 14) };
-                none.Child = Ui.Text("No keys remapped yet.", "SecondaryBody");
-                list.Children.Add(none);
-                return;
+                var none = Ui.Text(p.IsGlobal ? "No keys remapped yet." : "No keys remapped for " + p.App + " yet.", "SecondaryBody");
+                remapGroup.Add(new Border { Padding = new Thickness(56, 14, 16, 14), Child = none });
             }
-            foreach (var b in keys) list.Children.Add(Row(b));
+            foreach (var b in keys) remapGroup.Add(Row(b));
+            var tip = p.IsGlobal
+                ? "Remaps work in every app and on the laptop's own keyboard too. The K380's Easy-Switch keys and Fn work inside the keyboard and can't be changed. To change a media key, press it as you normally would after Add key."
+                : "Used only while " + p.App + " is in front, on top of the All apps list. Choose “Leave the key as it is” to switch a global remap off here.";
+            var tipRow = new Grid { ColumnSpacing = 16, Padding = new Thickness(16, 10, 16, 12) };
+            tipRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
+            tipRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var i = new FontIcon { Glyph = Glyph.Info, FontSize = 14, Foreground = Ui.Brush("TextFillColorSecondaryBrush"), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 1, 0, 0) };
+            var t = Note(tip);
+            Grid.SetColumn(t, 1);
+            tipRow.Children.Add(i);
+            tipRow.Children.Add(t);
+            remapGroup.Add(tipRow);
+            int count = store.Settings.Global.Keys.Count;
+            hero.SetCallout("remap", count == 0 ? "None" : count == 1 ? KeyNames.Combo(store.Settings.Global.Keys[0].Mods, store.Settings.Global.Keys[0].Vk) : count + " keys");
         }
 
         UIElement Row(KeyBinding b)
         {
-            var card = new Border { Style = Ui.Style("Card"), MinHeight = 56, Padding = new Thickness(56, 8, 12, 8) };
-            var g = new Grid { ColumnSpacing = 14 };
+            var g = new Grid { ColumnSpacing = 14, Padding = new Thickness(16, 10, 12, 10), MinHeight = 56 };
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var caps = Ui.KeyCaps(b.Mods, b.Vk);
+            caps.Margin = new Thickness(40, 0, 0, 0);
             var arrow = Ui.Icon(Glyph.Forward, 12);
             arrow.Foreground = Ui.Brush("TextFillColorSecondaryBrush");
             arrow.VerticalAlignment = VerticalAlignment.Center;
@@ -403,8 +488,7 @@ namespace LiteOptions.SettingsApp
                 }));
             Grid.SetColumn(arrow, 1); Grid.SetColumn(what, 2); Grid.SetColumn(buttons, 3);
             g.Children.Add(caps); g.Children.Add(arrow); g.Children.Add(what); g.Children.Add(buttons);
-            card.Child = g;
-            return card;
+            return g;
         }
 
         async void AddKey()
@@ -423,24 +507,164 @@ namespace LiteOptions.SettingsApp
             RefreshList();
         }
 
+        void UpdateTopRow()
+        {
+            var k = store.Keyboard;
+            string m = store.Settings.FnMode;
+            bool? media = k != null && k.FnSupported && k.FnMedia >= 0 ? k.FnMedia == 1 : m == "media" ? true : m == "standard" ? false : (bool?)null;
+            hero.SetCallout("toprow", media == true ? "Media keys first" : media == false ? "F1–F12 first" : "Left as it is");
+            string state = k == null ? "The keyboard isn't connected; your choice is applied when it connects."
+                         : !k.FnSupported ? "This keyboard didn't offer the top-row setting."
+                         : "Without holding Fn. Right now: " + (k.FnMedia == 1 ? "media keys first." : k.FnMedia == 0 ? "F1–F12 first." : "unknown.");
+            var sc = store.Settings.Global.Keys.FirstOrDefault(b => b.Action?.Kind == "preset" && b.Action.Preset == "fn_toggle");
+            fnCard.Description = state + (sc != null ? " Press " + KeyNames.Combo(sc.Mods, sc.Vk) + " to switch any time." : "");
+        }
+
         public override void LoadDevices()
         {
             var k = store.Keyboard;
+            bool global = Current.IsGlobal;
             hero.Fill(k, "No keyboard found", "Turn the keyboard on, or pair it in Settings › Bluetooth & devices. Key remapping works either way.", store.IsLow(k));
-            EasySwitch.Fill(hostsCard, k);
-            if (!Current.IsGlobal) hostsCard.Shown = false;
-            Show(hostsHeader, hostsCard.Shown);
-            string state = k == null ? "The keyboard isn't connected; your choice is applied when it connects."
-                         : !k.FnSupported ? "This keyboard didn't offer the top-row setting."
-                         : "Right now: " + (k.FnMedia == 1 ? "media keys first." : k.FnMedia == 0 ? "F1–F12 first." : "unknown.") + " Re-applied whenever the keyboard reconnects.";
-            var sc = store.Settings.Global.Keys.FirstOrDefault(b => b.Action?.Kind == "preset" && b.Action.Preset == "fn_toggle");
-            fnNote.Message = state + (sc != null ? " Press " + KeyNames.Combo(sc.Mods, sc.Vk) + " any time to switch." : "");
+            UpdateTopRow();
+
+            bool canOff = k != null && k.DisableCaps != 0;
+            Show(offHeader, canOff && global);
+            Show(keysOff, canOff && global);
+            if (canOff)
+            {
+                int shown = store.Settings.DisabledKeys >= 0 ? store.Settings.DisabledKeys & k.DisableCaps : Math.Max(0, k.DisabledKeys);
+                keysOff.Load(k.DisableCaps, shown);
+                hero.SetCallout("keysoff", keysOff.Summary(shown));
+            }
+            else hero.SetCallout("keysoff", null);
+
+            Channels.Fill(channels, k, false);
+            bool hosts = global && channels.Children.Count > 0;
+            Show(channels, hosts);
+            Show(hostsHeader, hosts);
         }
 
         public override void JumpTo(string id)
         {
-            if (id == "toprow" && fnCard.Visibility == Visibility.Visible) Jump(fnCard);
-            else Jump(remapCard);
+            if (id == "toprow" && fnGroup.Visibility == Visibility.Visible) Jump(fnCard);
+            else if (id == "keysoff" && keysOff.Visibility == Visibility.Visible) Jump(keysOff);
+            else Jump(remapHeader);
+        }
+    }
+
+    // ───────────────────────────── App profiles ─────────────────────────────
+
+    sealed partial class AppsPage : PageBase
+    {
+        readonly SettingsGroup list;
+
+        public override string Title => "App profiles";
+        public override bool UsesProfiles => false;
+
+        public AppsPage(Store store) : base(store)
+        {
+            Add(new TextBlock
+            {
+                Text = "Give an app its own middle button and keys. They apply only while that app is in front; everything else follows All apps.",
+                Style = Ui.Style("SecondaryBody"), Margin = new Thickness(0, 4, 0, 0),
+            });
+            var add = Ui.Button("Add an app", Glyph.Add, accent: true, click: async (s, e) => await AddApp());
+            Find(Section("Apps", add), "app profiles per-app add an app", "Add an app");
+            list = Group();
+        }
+
+        public override void LoadSettings()
+        {
+            list.Clear();
+            foreach (var p in store.Settings.Profiles) list.Add(Row(p));
+        }
+
+        UIElement Row(Profile p)
+        {
+            string middle = p.MiddleMode == "inherit" ? "middle button as All apps"
+                          : p.MiddleMode == "gestures" ? "middle button: gestures"
+                          : p.MiddleMode == "action" ? "middle button: " + Presets.Describe(p.MiddleAction, "Middle click")
+                          : "middle button: normal click";
+            string keys = p.Keys.Count == 0 ? "no keys remapped" : p.Keys.Count == 1 ? "1 key remapped" : p.Keys.Count + " keys remapped";
+            string summary = char.ToUpper(middle[0]) + middle.Substring(1) + " · " + keys;
+            var app = p.App;
+            var edit = Ui.Button("Edit", Glyph.Edit, false, (s, e) => { store.CurrentApp = app; Navigate?.Invoke("mouse"); });
+            UIElement right = edit;
+            if (!p.IsGlobal) right = Ui.Row(4, edit, Ui.IconButton(Glyph.Delete, "Remove " + app, async (s, e) => await RemoveApp(app)));
+            return new SettingCard(p.IsGlobal ? Glyph.Apps : Glyph.App, p.IsGlobal ? "All apps" : app, summary, right);
+        }
+
+        internal async System.Threading.Tasks.Task AddApp()
+        {
+            var exe = await Dialogs.AddAppAsync(store.Settings.Profiles.Select(p => p.App));
+            if (string.IsNullOrEmpty(exe)) return;
+            if (store.Settings.ForApp(exe) == null)
+            {
+                var p = new Profile { App = exe, MiddleMode = "inherit" };
+                p.Normalize();
+                store.Settings.Profiles.Add(p);
+                store.Settings.Normalize();
+                store.Save();
+            }
+            store.CurrentApp = exe;
+            Navigate?.Invoke("mouse");
+        }
+
+        internal async System.Threading.Tasks.Task RemoveApp(string app)
+        {
+            if (!await Ui.Confirm("Remove " + app + "?", "Its own middle-button and key settings are deleted. All apps settings stay as they are.", "Remove", danger: true)) return;
+            store.Settings.Profiles.RemoveAll(p => p.App == app);
+            store.Save();
+            if (store.CurrentApp == app) store.CurrentApp = "";
+            LoadSettings();
+        }
+    }
+
+    // ───────────────────────────── Pop-ups & alerts ─────────────────────────────
+
+    sealed partial class AlertsPage : PageBase
+    {
+        readonly ToggleSwitch popups, lockPopups, notify;
+        readonly SettingCard lockCard;
+        readonly ComboBox lowBatt;
+        static readonly int[] levels = { 10, 15, 20, 25, 30 };
+
+        public override string Title => "Pop-ups & alerts";
+        public override bool UsesProfiles => false;
+
+        public AlertsPage(Store store) : base(store)
+        {
+            Section("On-screen pop-ups");
+            var g = Group();
+            popups = Ui.Toggle();
+            popups.Toggled += (s, e) => { if (!loading) { store.Settings.ShowPopups = popups.IsOn; store.Save(); } lockCard.Shown = popups.IsOn; };
+            Find(g.Add(new SettingCard(Glyph.Message, "Pop-ups", "A small note at the bottom of every screen when you switch the top row, change DPI, mute the microphone or use a gesture", popups)), "pop-ups on-screen notes osd");
+            lockPopups = Ui.Toggle();
+            lockPopups.Toggled += (s, e) => { if (!loading) { store.Settings.LockKeyPopups = lockPopups.IsOn; store.Save(); } };
+            lockCard = Find(g.Add(new SettingCard(null, "Caps Lock and Num Lock", "Show a pop-up when Caps Lock, Num Lock or Scroll Lock is switched on or off", lockPopups).Indent()), "caps lock num lock scroll lock pop-up");
+
+            Section("Battery");
+            var b = Group();
+            notify = Ui.Toggle();
+            lowBatt = new ComboBox { MinWidth = 110 };
+            foreach (var v in levels) lowBatt.Items.Add("At " + v + "%");
+            notify.Toggled += (s, e) => { if (!loading) { store.Settings.Notifications = notify.IsOn; lowBatt.IsEnabled = notify.IsOn; store.Save(); } };
+            lowBatt.SelectionChanged += (s, e) => { if (!loading && lowBatt.SelectedIndex >= 0) { store.Settings.LowBatteryPercent = levels[lowBatt.SelectedIndex]; store.Save(); } };
+            Find(b.Add(new SettingCard(Glyph.Battery(30, false), "Low battery warning", "A Windows notification when the mouse or keyboard battery runs low", Ui.Row(16, lowBatt, notify))), "low battery warning notification");
+        }
+
+        public override void LoadSettings()
+        {
+            loading = true;
+            var s = store.Settings;
+            popups.IsOn = s.ShowPopups;
+            lockPopups.IsOn = s.LockKeyPopups;
+            lockCard.Shown = s.ShowPopups;
+            notify.IsOn = s.Notifications;
+            lowBatt.IsEnabled = s.Notifications;
+            int near = levels.OrderBy(v => Math.Abs(v - s.LowBatteryPercent)).First();
+            lowBatt.SelectedIndex = Array.IndexOf(levels, near);
+            loading = false;
         }
     }
 
@@ -448,13 +672,10 @@ namespace LiteOptions.SettingsApp
 
     sealed partial class SettingsPage : PageBase
     {
-        readonly ToggleSwitch startup, paused, notify, popups, lockPopups;
-        readonly SettingCard lockCard;
-        readonly ComboBox lowBatt;
+        readonly ToggleSwitch startup, paused;
         readonly SettingCard optionsCard, aboutCard;
         readonly TextBox diag;
         readonly Button diagToggle;
-        static readonly int[] levels = { 10, 15, 20, 25, 30 };
         public Func<System.Threading.Tasks.Task> RunSetup;
 
         public override string Title => "Settings";
@@ -463,45 +684,34 @@ namespace LiteOptions.SettingsApp
         public SettingsPage(Store store) : base(store)
         {
             Section("General");
+            var g = Group();
             startup = Ui.Toggle();
             startup.Toggled += (s, e) => { if (!loading) _ = store.Send("setStartup", on: startup.IsOn); };
-            Add(new SettingCard(Glyph.Power, "Start with Windows", "LiteOptions waits quietly in the tray after you sign in", startup));
-
+            Find(g.Add(new SettingCard(Glyph.Power, "Start with Windows", "LiteOptions waits quietly in the tray after you sign in", startup)), "start with windows startup login");
             paused = Ui.Toggle();
             paused.Toggled += (s, e) => { if (!loading) { store.Settings.Paused = paused.IsOn; store.Save(); } };
-            Add(new SettingCard(Glyph.Pause, "Pause remapping", "Buttons and keys work as normal until you switch this off", paused));
-
-            notify = Ui.Toggle();
-            lowBatt = new ComboBox { MinWidth = 110 };
-            foreach (var v in levels) lowBatt.Items.Add("At " + v + "%");
-            notify.Toggled += (s, e) => { if (!loading) { store.Settings.Notifications = notify.IsOn; lowBatt.IsEnabled = notify.IsOn; store.Save(); } };
-            lowBatt.SelectionChanged += (s, e) => { if (!loading && lowBatt.SelectedIndex >= 0) { store.Settings.LowBatteryPercent = levels[lowBatt.SelectedIndex]; store.Save(); } };
-            Add(new SettingCard(Glyph.Battery(30, false), "Low battery warning", "A notification when the mouse or keyboard battery runs low", Ui.Row(16, lowBatt, notify)));
-
-            popups = Ui.Toggle();
-            popups.Toggled += (s, e) => { if (!loading) { store.Settings.ShowPopups = popups.IsOn; store.Save(); } if (lockCard != null) lockCard.Shown = popups.IsOn; };
-            Add(new SettingCard(Glyph.Message, "On-screen pop-ups", "A small note at the bottom of the screen when you switch the top row, change DPI, mute the microphone or use a gesture", popups));
-            lockPopups = Ui.Toggle();
-            lockPopups.Toggled += (s, e) => { if (!loading) { store.Settings.LockKeyPopups = lockPopups.IsOn; store.Save(); } };
-            lockCard = Add(new SettingCard(null, "Caps Lock and Num Lock", "Show a pop-up when Caps Lock, Num Lock or Scroll Lock is switched on or off", lockPopups).Indent());
-
-            Add(new SettingCard(Glyph.Setup, "Setup", "Go through the three first-run choices again",
-                Ui.Button("Run setup", null, false, async (s, e) => { if (RunSetup != null) await RunSetup(); })));
+            Find(g.Add(new SettingCard(Glyph.Pause, "Pause remapping", "Buttons and keys work as normal until you switch this off", paused)), "pause remapping off disable");
+            Find(g.Add(new SettingCard(Glyph.Setup, "Setup", "Go through the three first-run choices again",
+                Ui.Button("Run setup", null, false, async (s, e) => { if (RunSetup != null) await RunSetup(); }))), "setup first run wizard");
 
             Section("Logi Options+");
-            optionsCard = Add(new SettingCard(Glyph.Check, "", "", Ui.Button("Installed apps", null, false, (s, e) => Open("ms-settings:appsfeatures"))));
-            Add(new NoteCard("Firmware updates for Logitech devices only come through Options+. They're rare and optional. If you ever want one: install Options+, let it update, then uninstall it — the firmware stays on the device."));
+            var o = Group();
+            optionsCard = Find(o.Add(new SettingCard(Glyph.Check, "", "", Ui.Button("Installed apps", null, false, (s, e) => Open("ms-settings:appsfeatures")))), "logi options+ logitech firmware");
+            var fw = new SettingCard(null, "Firmware updates", "They only come through Options+, and they're rare and optional. If you ever want one: install Options+, let it update, then uninstall it. The firmware stays on the device.");
+            o.Add(fw.Indent());
 
             Section("About");
-            aboutCard = Add(new SettingCard(Glyph.Info, "LiteOptions", "To update, download the new LiteOptions installer and double-click it. Your settings are kept. No account, no internet, no telemetry.",
+            var a = Group();
+            aboutCard = Find(a.Add(new SettingCard(Glyph.Info, "LiteOptions", "To update, download the new LiteOptions installer and double-click it. Your settings are kept. No account, no internet, no telemetry.",
                 Ui.Button("Settings folder", Glyph.Folder, false, (s, e) =>
                 {
                     try { System.IO.Directory.CreateDirectory(AppSettings.Folder); Process.Start("explorer.exe", "\"" + AppSettings.Folder + "\"")?.Dispose(); } catch { }
-                })));
-            Add(new SettingCard(Glyph.Delete, "Uninstall LiteOptions", "Removes the app, its settings and its startup entry", Ui.DangerButton("Uninstall", (s, e) => Uninstall())));
+                }))), "about version update");
+            Find(a.Add(new SettingCard(Glyph.Delete, "Uninstall LiteOptions", "Removes the app, its settings and its startup entry", Ui.DangerButton("Uninstall", (s, e) => Uninstall()))), "uninstall remove");
 
             Section("Troubleshooting");
-            diag = new TextBox { Style = Ui.Style("Mono"), Height = 260, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 4, 0, 0) };
+            var t = Group();
+            diag = new TextBox { Style = Ui.Style("Mono"), Height = 260, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 8, 0, 0) };
             ScrollViewer.SetHorizontalScrollBarVisibility(diag, ScrollBarVisibility.Auto);
             ScrollViewer.SetVerticalScrollBarVisibility(diag, ScrollBarVisibility.Auto);
             diagToggle = Ui.Button("Show details", null, false, async (s, e) =>
@@ -511,7 +721,7 @@ namespace LiteOptions.SettingsApp
                 ((Button)s).Content = show ? "Hide details" : "Show details";
                 if (show) diag.Text = await Diagnostics();
             });
-            Add(new SettingCard(Glyph.Diagnostic, "Diagnostics", "What LiteOptions found and did. If something isn't working, copy this and send it to Claude.",
+            Find(t.Add(new SettingCard(Glyph.Diagnostic, "Diagnostics", "What LiteOptions found and did. If something isn't working, copy this and send it to Claude.",
                 Ui.Row(8,
                     Ui.Button("Copy", Glyph.Copy, false, async (s, e) =>
                     {
@@ -521,7 +731,7 @@ namespace LiteOptions.SettingsApp
                         ((Button)s).Content = Ui.Row(8, Ui.Icon(Glyph.Check, 14), new TextBlock { Text = "Copied" });
                     }),
                     Ui.Button("Re-scan", Glyph.Refresh, false, async (s, e) => { await store.Send("rescan"); }),
-                    diagToggle)));
+                    diagToggle))), "diagnostics log troubleshooting rescan");
             Add(diag);
             var classic = new HyperlinkButton { Content = "Open the classic settings window instead", Margin = new Thickness(0, 6, 0, 0) };
             classic.Click += (s, e) => _ = store.Send("classic");
@@ -552,15 +762,7 @@ namespace LiteOptions.SettingsApp
         public override void LoadSettings()
         {
             loading = true;
-            var s = store.Settings;
-            paused.IsOn = s.Paused;
-            notify.IsOn = s.Notifications;
-            lowBatt.IsEnabled = s.Notifications;
-            popups.IsOn = s.ShowPopups;
-            lockPopups.IsOn = s.LockKeyPopups;
-            lockCard.Shown = s.ShowPopups;
-            int near = levels.OrderBy(v => Math.Abs(v - s.LowBatteryPercent)).First();
-            lowBatt.SelectedIndex = Array.IndexOf(levels, near);
+            paused.IsOn = store.Settings.Paused;
             loading = false;
         }
 

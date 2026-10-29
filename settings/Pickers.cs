@@ -14,47 +14,118 @@ using Windows.Storage.Pickers;
 
 namespace LiteOptions.SettingsApp
 {
-    /// <summary>The action chooser: a drop-down button whose menu groups the presets, plus custom actions.</summary>
-    /// <remarks>Wraps a DropDownButton rather than deriving from it: a subclass loses the button's ▾ look.</remarks>
+    /// <summary>
+    /// The action chooser. Shows as a drop-down button, or as a tile (the middle-button gestures). Either way it opens
+    /// a panel with a search box, category chips, every action with its icon and shortcut, and the custom actions.
+    /// </summary>
     sealed partial class ActionPicker : UserControl
     {
         readonly Store store;
         readonly string defaultLabel;
         readonly bool allowNothing;
-        readonly TextBlock label;
-        readonly DropDownButton button;
+        readonly bool tile;
+        readonly Button button;
+        readonly TextBlock label, hint;
+        readonly Flyout flyout;
         ActionSpec spec = ActionSpec.Default();
 
         public event Action<ActionSpec> Changed;
         /// <summary>Set inside dialogs: custom actions are then edited in the dialog itself (WinUI shows one dialog at a time).</summary>
         public Action<string> InlineCustom;
 
-        public ActionPicker(Store store, string defaultLabel, bool allowNothing = true)
+        public ActionPicker(Store store, string defaultLabel, bool allowNothing = true) : this(store, defaultLabel, allowNothing, null, null, false) { }
+
+        /// <summary>A tile for a gesture: the direction and its arrow at the top, then the action and its shortcut.</summary>
+        public static ActionPicker Tile(Store store, string defaultLabel, bool allowNothing, string direction, string glyph, bool accent) =>
+            new ActionPicker(store, defaultLabel, allowNothing, direction, glyph, accent);
+
+        ActionPicker(Store store, string defaultLabel, bool allowNothing, string direction, string glyph, bool accent)
         {
             this.store = store;
             this.defaultLabel = defaultLabel;
             this.allowNothing = allowNothing;
+            tile = direction != null;
             IsTabStop = false;
-            label = new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 250, TextAlignment = TextAlignment.Left };
-            button = new DropDownButton { Content = label, MinWidth = 250, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left };
-            var f = new MenuFlyout { Placement = FlyoutPlacementMode.BottomEdgeAlignedLeft };
-            f.Opening += (s, e) => Build(f);
-            button.Flyout = f;
+            flyout = new Flyout { Placement = FlyoutPlacementMode.BottomEdgeAlignedLeft, FlyoutPresenterStyle = PresenterStyle() };
+            flyout.Opening += (s, e) => flyout.Content = BuildPanel();
+
+            if (!tile)
+            {
+                label = new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 230, TextAlignment = TextAlignment.Left };
+                button = new DropDownButton { Content = label, MinWidth = 230, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left, Flyout = flyout };
+            }
+            else
+            {
+                var top = new Grid();
+                var dir = new TextBlock { Text = direction, Style = Ui.Style("CaptionTextBlockStyle") };
+                var arrow = new FontIcon { Glyph = glyph ?? "", FontSize = 14, HorizontalAlignment = HorizontalAlignment.Right };
+                top.Children.Add(dir);
+                top.Children.Add(arrow);
+                label = new TextBlock { Style = Ui.Style("BodyStrongTextBlockStyle"), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap };
+                hint = new TextBlock { Style = Ui.Style("CaptionTextBlockStyle"), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap };
+                var faint = Ui.Brush(accent ? "TextOnAccentFillColorSecondaryBrush" : "TextFillColorSecondaryBrush");
+                dir.Foreground = faint; arrow.Foreground = faint; hint.Foreground = faint;
+                button = new Button
+                {
+                    Content = Ui.Column(4, top, label, hint),
+                    HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch,
+                    HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Top,
+                    Padding = new Thickness(14, 10, 14, 10), MinHeight = 80, CornerRadius = new CornerRadius(6),
+                    Flyout = flyout,
+                };
+                if (accent) button.Style = Ui.Style("AccentButtonStyle");
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, direction);
+            }
             Content = button;
             Value = ActionSpec.Default();
         }
 
-        /// <summary>Open the menu (used by the screenshot tour).</summary>
+        static Style PresenterStyle()
+        {
+            var st = new Style(typeof(FlyoutPresenter));
+            st.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
+            st.Setters.Add(new Setter(Control.CornerRadiusProperty, new CornerRadius(8)));
+            st.Setters.Add(new Setter(FrameworkElement.MaxWidthProperty, 460.0));
+            st.Setters.Add(new Setter(FrameworkElement.MaxHeightProperty, 680.0));
+            st.Setters.Add(new Setter(ScrollViewer.VerticalScrollBarVisibilityProperty, ScrollBarVisibility.Disabled));
+            return st;
+        }
+
+        /// <summary>Open the panel (used by the screenshot tour).</summary>
         public FlyoutBase OpenMenu()
         {
-            button.Flyout.ShowAt(button);
-            return button.Flyout;
+            flyout.ShowAt(button);
+            return flyout;
         }
 
         public ActionSpec Value
         {
             get => spec.Clone();
-            set { spec = value?.Clone() ?? ActionSpec.Default(); label.Text = Presets.Describe(spec, defaultLabel); }
+            set
+            {
+                spec = value?.Clone() ?? ActionSpec.Default();
+                label.Text = tile ? Short(spec) : Presets.Describe(spec, defaultLabel);
+                if (hint != null) { hint.Text = HintOf(spec); hint.Visibility = hint.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed; }
+            }
+        }
+
+        /// <summary>The action's name without the "Shortcut:" / "Open:" prefixes (tiles are small).</summary>
+        string Short(ActionSpec a)
+        {
+            if (a == null || a.IsDefault) return defaultLabel;
+            if (a.Kind == "keys") return "Shortcut";
+            if (a.Kind == "launch") return "Open " + (Presets.Describe(a).Replace("Open: ", ""));
+            if (a.Kind == "text") return "Type text";
+            return Presets.Describe(a, defaultLabel);
+        }
+
+        static string HintOf(ActionSpec a)
+        {
+            if (a == null || a.IsDefault || a.Kind == "none") return "";
+            if (a.Kind == "keys") return KeyNames.Combo(a.Mods, a.Vk);
+            if (a.Kind == "preset") return Hint(Presets.Get(a.Preset));
+            if (a.Kind == "text") return "“" + (a.Text != null && a.Text.Length > 20 ? a.Text.Substring(0, 20) + "…" : a.Text) + "”";
+            return "";
         }
 
         /// <summary>Show a label without changing the value (used while a custom action is being edited inline).</summary>
@@ -66,54 +137,223 @@ namespace LiteOptions.SettingsApp
             Changed?.Invoke(Value);
         }
 
+        // ───────────── the panel ─────────────
+
+        static readonly Dictionary<string, string> glyphs = new Dictionary<string, string>
+        {
+            { "middle_click", "" }, { "back", "" }, { "forward", "" }, { "double_click", "" }, { "right_click", "" },
+            { "ctrl_click", "" }, { "shift_click", "" },
+            { "task_view", "" }, { "show_desktop", "" }, { "desktop_left", "" }, { "desktop_right", "" },
+            { "switch_app", "" }, { "snip", "" }, { "emoji", "" }, { "dictation", "" }, { "clipboard", "" },
+            { "search", "" }, { "explorer", "" }, { "notifications", "" }, { "minimize", "" }, { "maximize", "" },
+            { "close_window", "" }, { "settings", "" }, { "quick_settings", "" }, { "input_language", "" },
+            { "print_screen", "" }, { "lock", "" }, { "sleep", "" }, { "calc", "" },
+            { "brightness_up", "" }, { "brightness_down", "" },
+            { "fn_toggle", "" }, { "pause_toggle", "" }, { "open_app", "" },
+            { "copy", "" }, { "cut", "" }, { "paste", "" }, { "paste_plain", "" }, { "undo", "" }, { "redo", "" },
+            { "select_all", "" }, { "save", "" }, { "find", "" }, { "print", "" },
+            { "new_tab", "" }, { "close_tab", "" }, { "reopen_tab", "" }, { "next_tab", "" }, { "prev_tab", "" },
+            { "refresh", "" }, { "zoom_in", "" }, { "zoom_out", "" }, { "zoom_reset", "" },
+            { "play_pause", "" }, { "next_track", "" }, { "prev_track", "" }, { "stop", "" },
+            { "mute", "" }, { "vol_up", "" }, { "vol_down", "" }, { "mic_mute", "" },
+        };
+
         static string GroupGlyph(string group)
         {
             switch (group)
             {
                 case "Mouse": return Glyph.Mouse;
-                case "Windows": return "\uE782";
-                case "Screen": return "\uE706";
+                case "Windows": return "";
+                case "Screen": return "";
                 case "LiteOptions": return Glyph.Keyboard;
                 case "Editing": return Glyph.Edit;
-                case "Browser & tabs": return "\uE774";
-                case "Media": return "\uE8D6";
+                case "Browser & tabs": return "";
+                case "Media": return "";
             }
-            return null;
+            return "";
         }
 
-        void Build(MenuFlyout f)
+        static string GlyphOf(Preset p) => p != null && glyphs.TryGetValue(p.Id, out var g) ? g : GroupGlyph(p?.Group);
+
+        /// <summary>What a preset sends, shown in small type next to it.</summary>
+        static string Hint(Preset p)
         {
-            f.Items.Clear();
-            f.Items.Add(Item(defaultLabel, spec.IsDefault, () => Set(ActionSpec.Default())));
-            if (allowNothing) f.Items.Add(Item("Do nothing", spec.Kind == "none", () => Set(ActionSpec.Nothing())));
-            f.Items.Add(new MenuFlyoutSeparator());
-            foreach (var group in Presets.All.GroupBy(p => p.Group))
+            if (p == null) return "";
+            if (p.Vk != 0) return KeyNames.Combo(p.Mods, p.Vk).Replace("Equals", "=");
+            switch (p.Special)
             {
-                var sub = new MenuFlyoutSubItem { Text = group.Key };
-                var g = GroupGlyph(group.Key);
-                if (g != null) sub.Icon = new FontIcon { Glyph = g };
-                foreach (var p in group)
-                {
-                    var id = p.Id;
-                    sub.Items.Add(Item(p.Label, spec.Kind == "preset" && spec.Preset == id, () => Set(ActionSpec.Of(id))));
-                }
-                f.Items.Add(sub);
+                case "lock": return "Win + L";
+                case "app:sleep": return "Screen off";
+                case "app:brightness_up":
+                case "app:brightness_down": return "Laptop screen";
+                case "app:fn_toggle": return "Media ↔ F1–F12";
             }
-            f.Items.Add(new MenuFlyoutSeparator());
-            f.Items.Add(Item(spec.Kind == "keys" ? "Keyboard shortcut: " + KeyNames.Combo(spec.Mods, spec.Vk) + "…" : "Keyboard shortcut…", spec.Kind == "keys", () => Custom("keys")));
-            f.Items.Add(Item(spec.Kind == "launch" ? Presets.Describe(spec) + "…" : "Open an app, file, folder or website…", spec.Kind == "launch", () => Custom("launch")));
-            f.Items.Add(Item(spec.Kind == "text" ? Presets.Describe(spec) + "…" : "Type text…", spec.Kind == "text", () => Custom("text")));
+            return "";
         }
 
-        static MenuFlyoutItemBase Item(string text, bool check, Action click)
+        FrameworkElement BuildPanel()
         {
-            var i = new ToggleMenuFlyoutItem { Text = text, IsChecked = check };
-            i.Click += (s, e) => click();
-            return i;
+            string group = "All";
+            var search = new TextBox { PlaceholderText = "Search actions", Margin = new Thickness(12, 12, 12, 8) };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(search, "Search actions");
+            var chipRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(12, 0, 12, 10) };
+            var chipScroll = new ScrollViewer
+            {
+                Content = chipRow, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollMode = ScrollMode.Enabled,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollMode = ScrollMode.Disabled,
+            };
+            var list = new StackPanel { Padding = new Thickness(6, 4, 6, 6) };
+            var listScroll = new ScrollViewer { Content = list, MaxHeight = 340, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+
+            var chips = new List<ToggleButton>();
+            void refill()
+            {
+                list.Children.Clear();
+                string q = (search.Text ?? "").Trim();
+                bool any = false;
+                if (q.Length == 0 && group == "All" && !spec.IsDefault && spec.Kind != "none")
+                {
+                    list.Children.Add(Header("Current"));
+                    var cur = spec.Kind == "preset" ? Presets.Get(spec.Preset) : null;
+                    list.Children.Add(Item(cur != null ? GlyphOf(cur) : CustomGlyph(spec.Kind), Presets.Describe(spec), HintOf(spec), true,
+                        () => { if (spec.Kind == "preset") Pick(spec); else Custom(spec.Kind); }));
+                }
+                foreach (var g in Presets.All.GroupBy(p => p.Group))
+                {
+                    if (group != "All" && g.Key != group) continue;
+                    var matches = g.Where(p => q.Length == 0
+                        || p.Label.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
+                        || g.Key.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
+                        || Hint(p).IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+                    if (matches.Count == 0) continue;
+                    any = true;
+                    list.Children.Add(Header(g.Key));
+                    foreach (var p in matches)
+                    {
+                        var id = p.Id;
+                        bool current = spec.Kind == "preset" && spec.Preset == id;
+                        list.Children.Add(Item(GlyphOf(p), p.Label, Hint(p), current, () => Pick(ActionSpec.Of(id))));
+                    }
+                }
+                if (!any && q.Length > 0)
+                {
+                    var none = Ui.Text("No actions match “" + q + "”. Try a keyboard shortcut instead.", "SecondaryBody");
+                    none.Margin = new Thickness(10, 12, 10, 12);
+                    list.Children.Add(none);
+                }
+            }
+
+            foreach (var name in new[] { "All" }.Concat(Presets.All.Select(p => p.Group).Distinct()))
+            {
+                var g = name;
+                var chip = new ToggleButton { Content = name == "Browser & tabs" ? "Browser" : name, IsChecked = name == "All", CornerRadius = new CornerRadius(14), Padding = new Thickness(12, 3, 12, 4), MinHeight = 28, FontSize = 12 };
+                chip.Click += (s, e) =>
+                {
+                    group = g;
+                    foreach (var c in chips) c.IsChecked = ReferenceEquals(c, s);
+                    refill();
+                };
+                chips.Add(chip);
+                chipRow.Children.Add(chip);
+            }
+            search.TextChanged += (s, e) => refill();
+            refill();
+
+            var footer = new StackPanel { Padding = new Thickness(6) };
+            footer.Children.Add(Item("", spec.Kind == "keys" ? "Keyboard shortcut: " + KeyNames.Combo(spec.Mods, spec.Vk) + "…" : "Keyboard shortcut…", "", false, () => Custom("keys"), chevron: true));
+            footer.Children.Add(Item("", spec.Kind == "launch" ? Presets.Describe(spec) + "…" : "Open an app, file or website…", "", false, () => Custom("launch"), chevron: true));
+            footer.Children.Add(Item("", spec.Kind == "text" ? Presets.Describe(spec) + "…" : "Type text…", "", false, () => Custom("text"), chevron: true));
+            var bottom = new Grid { ColumnSpacing = 6, Margin = new Thickness(4, 6, 4, 2) };
+            bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            if (allowNothing) bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var def = new Button { Content = (spec.IsDefault ? "✓ " : "") + defaultLabel, HorizontalAlignment = HorizontalAlignment.Stretch };
+            def.Click += (s, e) => Pick(ActionSpec.Default());
+            bottom.Children.Add(def);
+            if (allowNothing)
+            {
+                var nothing = new Button { Content = (spec.Kind == "none" ? "✓ " : "") + "Do nothing", HorizontalAlignment = HorizontalAlignment.Stretch };
+                nothing.Click += (s, e) => Pick(ActionSpec.Nothing());
+                Grid.SetColumn(nothing, 1);
+                bottom.Children.Add(nothing);
+            }
+            footer.Children.Add(bottom);
+
+            var root = new StackPanel { Width = 400 };
+            root.Children.Add(search);
+            root.Children.Add(chipScroll);
+            root.Children.Add(Divider());
+            root.Children.Add(listScroll);
+            root.Children.Add(Divider());
+            root.Children.Add(footer);
+            return root;
+        }
+
+        static string CustomGlyph(string kind) => kind == "keys" ? "" : kind == "launch" ? "" : kind == "text" ? "" : "";
+
+        static Border Divider() => new Border { Height = 1, Background = Ui.Brush("DividerStrokeColorDefaultBrush") };
+
+        static TextBlock Header(string text) => new TextBlock
+        {
+            Text = text, Style = Ui.Style("CaptionTextBlockStyle"), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = Ui.Brush("TextFillColorSecondaryBrush"), Margin = new Thickness(10, 10, 10, 4),
+        };
+
+        static Button Item(string glyph, string text, string keys, bool current, Action click, bool chevron = false)
+        {
+            var g = new Grid { ColumnSpacing = 12 };
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var icon = new FontIcon { Glyph = glyph, FontSize = 16, VerticalAlignment = VerticalAlignment.Center };
+            var t = new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+            Grid.SetColumn(t, 1);
+            g.Children.Add(icon);
+            g.Children.Add(t);
+            if (!string.IsNullOrEmpty(keys))
+            {
+                var k = new Border
+                {
+                    Background = Ui.Brush("SubtleFillColorSecondaryBrush"), CornerRadius = new CornerRadius(3), Padding = new Thickness(6, 1, 6, 2),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Child = new TextBlock { Text = keys, FontSize = 11, Foreground = Ui.Brush("TextFillColorSecondaryBrush") },
+                };
+                Grid.SetColumn(k, 2);
+                g.Children.Add(k);
+            }
+            if (current || chevron)
+            {
+                var mark = new FontIcon { Glyph = current ? Glyph.Check : "", FontSize = current ? 14 : 12, VerticalAlignment = VerticalAlignment.Center };
+                if (current) mark.Foreground = Ui.Brush("AccentTextFillColorPrimaryBrush");
+                Grid.SetColumn(mark, 3);
+                g.Children.Add(mark);
+            }
+            if (current)
+            {
+                icon.Foreground = Ui.Brush("AccentTextFillColorPrimaryBrush");
+                t.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
+            }
+            var b = new Button
+            {
+                Content = g, Style = Ui.Style("SubtleButton"),
+                HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                Padding = new Thickness(10, 7, 10, 7), MinHeight = 36,
+            };
+            if (current) b.Background = Ui.Brush("SubtleFillColorSecondaryBrush");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(b, text + (string.IsNullOrEmpty(keys) ? "" : ", " + keys) + (current ? ", current" : ""));
+            b.Click += (s, e) => click();
+            return b;
+        }
+
+        void Pick(ActionSpec a)
+        {
+            flyout.Hide();
+            Set(a);
         }
 
         async void Custom(string kind)
         {
+            flyout.Hide();
             if (InlineCustom != null) { InlineCustom(kind); return; }
             var result = await Dialogs.EditCustomAsync(store, kind, spec.Kind == kind ? spec : null);
             if (result != null) Set(result);

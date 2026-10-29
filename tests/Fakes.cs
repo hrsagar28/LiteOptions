@@ -22,6 +22,7 @@ namespace LiteOptions.Tests
         public int Requests;
         public int DropFnWrites; // ignore this many "set Fn mode" requests, like a keyboard that has only just woken up
         public readonly List<FakeHost> Hosts = new List<FakeHost>();
+        public int DisableCaps, Disabled;
         public int CurrentHost;
 
         public static FakeDevice PebbleM350s()
@@ -40,6 +41,8 @@ namespace LiteOptions.Tests
             d.Features[Feature.BatteryStatus] = 4; d.Features[Feature.ChangeHost] = 5; d.Features[Feature.WirelessStatus] = 6;
             d.Features[Feature.FnInversion] = 0x0B; // the index k380_conf.c hard-codes
             d.Features[Feature.HostsInfo] = 7;
+            d.Features[Feature.DisableKeys] = 8;
+            d.DisableCaps = 0x1D; // Caps Lock, Scroll Lock, Insert, Windows key (what Options+ offers for the K380)
             d.Hosts.Add(new FakeHost());
             d.Hosts.Add(new FakeHost { Paired = true, Name = "WORK-LAPTOP" });
             d.Hosts.Add(new FakeHost { Paired = true, Name = "Anna\u2019s iPhone 15 Pro Max" }); // longer than one 14-byte chunk, with a 3-byte character
@@ -117,6 +120,11 @@ namespace LiteOptions.Tests
                         if (p[1] < nb.Length) Array.Copy(nb, p[1], r, 2, Math.Min(14, nb.Length - p[1]));
                         return r;
                     }
+                    break;
+                case Feature.DisableKeys:
+                    if (fn == 0) return new[] { (byte)DisableCaps };
+                    if (fn == 1) return new[] { (byte)Disabled };
+                    if (fn == 2) { Disabled = p[0] & DisableCaps; return new byte[0]; }
                     break;
                 case Feature.FnInversion:
                     if (fn == 0) return new byte[] { (byte)(FnInv ? 1 : 0) };

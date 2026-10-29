@@ -107,7 +107,7 @@ namespace LiteOptions
             using (var all = s.Get())
                 foreach (ManagementObject o in all)
                     using (o) o.InvokeMethod("WmiSetBrightness", new object[] { (uint)1, (byte)target });
-            return new Result { Title = "Brightness " + target + "%", Level = target / 100.0 };
+            return new Result { Title = target + "%", Level = target / 100.0 }; // the bar pop-up shows the title as its value
         }
 
         // ───────────── sleep ─────────────

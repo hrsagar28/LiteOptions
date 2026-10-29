@@ -52,6 +52,8 @@ namespace LiteOptions.Ipc
         [DataMember] public string LastError = "";
         [DataMember] public List<HostDto> Hosts;        // Easy-Switch channels; null = the device doesn't say
         [DataMember] public int CurrentHost = -1;        // 0-based
+        [DataMember] public int DisableCaps;             // keys the keyboard can switch off itself (bit mask); 0 = none
+        [DataMember] public int DisabledKeys = -1;       // switched off right now; -1 unknown
 
         public string BatteryText => !HasBattery ? "" : BatteryPercent >= 0 ? BatteryPercent + "%" : BatteryLevel;
     }

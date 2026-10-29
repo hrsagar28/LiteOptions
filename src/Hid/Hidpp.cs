@@ -132,7 +132,8 @@ namespace LiteOptions.Hid
         public const ushort Root = 0x0000, FeatureSet = 0x0001, FwVersion = 0x0003, DeviceName = 0x0005,
             BatteryStatus = 0x1000, BatteryVoltage = 0x1001, UnifiedBattery = 0x1004,
             ChangeHost = 0x1814, HostsInfo = 0x1815, WirelessStatus = 0x1D4B,
-            AdjustableDpi = 0x2201, FnInversion = 0x40A0, NewFnInversion = 0x40A2, K375sFnInversion = 0x40A3;
+            AdjustableDpi = 0x2201, FnInversion = 0x40A0, NewFnInversion = 0x40A2, K375sFnInversion = 0x40A3,
+            DisableKeys = 0x4521;
     }
 
     public enum DeviceKind { Unknown, Keyboard, Mouse, Other }
@@ -326,6 +327,22 @@ namespace LiteOptions.Hid
                 for (int i = 0; i < n; i++) bytes.Add(p[2 + i]);
             }
             return Encoding.UTF8.GetString(bytes.ToArray()).Trim('\0', ' ');
+        }
+
+        // ── keys the keyboard can switch off by itself (0x4521): 1 Caps Lock, 2 Num Lock, 4 Scroll Lock, 8 Insert, 16 Windows key ──
+        public int ReadDisableKeysCapabilities() => Call(Feature.DisableKeys, 0)[0];
+        public int ReadDisabledKeys() => Call(Feature.DisableKeys, 1)[0];
+        public void WriteDisabledKeys(int mask) => Call(Feature.DisableKeys, 2, (byte)mask);
+
+        public static string DisabledKeyNames(int mask)
+        {
+            var names = new List<string>();
+            if ((mask & 0x01) != 0) names.Add("Caps Lock");
+            if ((mask & 0x02) != 0) names.Add("Num Lock");
+            if ((mask & 0x04) != 0) names.Add("Scroll Lock");
+            if ((mask & 0x08) != 0) names.Add("Insert");
+            if ((mask & 0x10) != 0) names.Add("Windows key");
+            return names.Count == 0 ? "none" : string.Join(", ", names);
         }
 
         // ── battery ──

@@ -48,8 +48,29 @@ namespace LiteOptions.SettingsApp
                 log.Add("settings round trip: identical");
 
                 // every page builds and lays out
-                foreach (var tag in new[] { "keys", "settings", "mouse" }) { w.ShowPage(tag); await Task.Delay(400); }
-                log.Add("pages: mouse, keyboard, settings shown");
+                foreach (var tag in new[] { "keys", "apps", "alerts", "settings", "mouse" }) { w.ShowPage(tag); await Task.Delay(400); }
+                log.Add("pages: mouse, keyboard, app profiles, pop-ups & alerts, settings shown");
+
+                // the search box finds settings on other pages and goes to them
+                w.ShowSearch("smooth");
+                await Task.Delay(400);
+                bool found = w.SearchResults("smooth").Contains("Smooth scrolling");
+                w.ClearSearch();
+                if (!found) { Finish(false, "search: 'smooth' did not find Smooth scrolling (got: " + string.Join(", ", w.SearchResults("smooth")) + ")"); return; }
+                w.ShowPage("settings"); await Task.Delay(300);
+                w.GoToFirst("caps lock"); await Task.Delay(600);
+                if (w.CurrentTag != "alerts") { Finish(false, "search: 'caps lock' went to " + w.CurrentTag + ", not pop-ups & alerts"); return; }
+                w.ShowPage("mouse"); await Task.Delay(300);
+                log.Add("search: finds and opens settings on other pages");
+
+                // the tray panel builds, lays out and hides again
+                var panel = new TrayFlyout(store, _ => { });
+                panel.ShowFlyout();
+                await Task.Delay(1500);
+                double ph = panel.RootElement.ActualHeight;
+                panel.HideFlyout();
+                if (ph < 200) { Finish(false, "tray panel: laid out only " + ph + " px tall"); return; }
+                log.Add($"tray panel: {ph:0} px tall, hides again");
 
                 // the menu folds away on a narrow window and comes back on a wide one
                 var size = w.AppWindow.Size;
@@ -113,6 +134,20 @@ namespace LiteOptions.SettingsApp
             w.ScrollToEnd(); await snap("04-keyboard-lower");
             w.ShowPage("settings"); await snap("05-settings");
             w.ScrollToEnd(); await snap("06-settings-lower");
+            w.ShowPage("apps"); await snap("19-apps");
+            w.ShowPage("alerts"); await snap("20-alerts");
+            w.ShowPage("mouse");
+            w.ShowSearch("scroll"); await snap("21-search");
+            w.ClearSearch();
+
+            var panel = new TrayFlyout(store, _ => { });
+            panel.SetTheme(Ui.Theme);
+            panel.ShowFlyout();
+            await Task.Delay(1500);
+            try { await SaveScreen(panel.Handle, Path.Combine(dir, prefix + "22-tray.png")); } catch (Exception ex) { File.AppendAllText(Path.Combine(dir, "errors.txt"), "22-tray (screen): " + ex.Message + Environment.NewLine); }
+            try { await SaveXaml(panel.RootElement, Path.Combine(dir, prefix + "22-tray-xaml.png")); } catch (Exception ex) { File.AppendAllText(Path.Combine(dir, "errors.txt"), "22-tray (xaml): " + ex.Message + Environment.NewLine); }
+            panel.HideFlyout();
+            await Task.Delay(400);
 
             store.CurrentApp = "excel.exe"; w.ReloadPages();
             w.ShowPage("mouse"); await snap("07-mouse-excel");
@@ -157,16 +192,15 @@ namespace LiteOptions.SettingsApp
 
         public static async Task CaptureAsync(MainWindow w, string dir, string name)
         {
-            try { await SaveScreen(Path.Combine(dir, name + ".png")); }
+            try { await SaveScreen(MainWindow.Hwnd, Path.Combine(dir, name + ".png")); }
             catch (Exception ex) { try { File.AppendAllText(Path.Combine(dir, "errors.txt"), name + " (screen): " + ex.Message + Environment.NewLine); } catch { } }
             try { await SaveXaml(w.RootElement, Path.Combine(dir, name + "-xaml.png")); }
             catch (Exception ex) { try { File.AppendAllText(Path.Combine(dir, "errors.txt"), name + " (xaml): " + ex.Message + Environment.NewLine); } catch { } }
         }
 
         /// <summary>What's actually on screen inside the window (includes menus, dialogs and the Mica backdrop).</summary>
-        static async Task SaveScreen(string path)
+        static async Task SaveScreen(IntPtr hwnd, string path)
         {
-            IntPtr hwnd = MainWindow.Hwnd;
             if (W32.DwmGetWindowAttribute(hwnd, 9 /* DWMWA_EXTENDED_FRAME_BOUNDS */, out W32.RECT r, Marshal.SizeOf<W32.RECT>()) != 0)
                 W32.GetWindowRect(hwnd, out r);
             int w = r.Right - r.Left, h = r.Bottom - r.Top;

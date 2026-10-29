@@ -177,28 +177,32 @@ namespace LiteOptions.UI
             }
         }
 
-        /// <summary>Draws the pop-up (public so the preview can render it on Linux).</summary>
+        /// <summary>
+        /// Draws the pop-up in the style of Windows 11's own volume and brightness pop-ups (public so tests can render it).
+        /// Two layouts: icon + title (+ subtitle), or icon + bar + value when there's a level to show.
+        /// </summary>
         public static Bitmap Render(float k, string glyph, string title, string subtitle, double? progress, bool dark)
         {
-            Color bg = dark ? Color.FromArgb(246, 44, 44, 44) : Color.FromArgb(250, 249, 249, 249);
-            Color border = dark ? Color.FromArgb(255, 64, 64, 64) : Color.FromArgb(255, 222, 222, 222);
-            Color text = dark ? Color.White : Color.FromArgb(26, 26, 26);
-            Color muted = dark ? Color.FromArgb(200, 200, 200) : Color.FromArgb(93, 93, 93);
+            Color bg = dark ? Color.FromArgb(250, 44, 44, 44) : Color.FromArgb(252, 249, 249, 249);
+            Color border = dark ? Color.FromArgb(255, 66, 66, 66) : Color.FromArgb(255, 222, 222, 222);
+            Color text = dark ? Color.White : Color.FromArgb(27, 27, 27);
+            Color muted = dark ? Color.FromArgb(206, 206, 206) : Color.FromArgb(94, 94, 94);
             Color accent = dark ? Color.FromArgb(76, 194, 255) : Color.FromArgb(0, 95, 184);
-            Color track = dark ? Color.FromArgb(90, 90, 90) : Color.FromArgb(205, 205, 205);
+            Color track = dark ? Color.FromArgb(150, 150, 150) : Color.FromArgb(138, 138, 138);
 
-            using (var titleFont = new Font("Segoe UI Semibold", 15f * k, GraphicsUnit.Pixel))
-            using (var subFont = new Font("Segoe UI", 12.5f * k, GraphicsUnit.Pixel))
-            using (var iconFont = new Font(Theme.IconFamily, 22f * k, GraphicsUnit.Pixel))
+            using (var titleFont = new Font("Segoe UI Semibold", 14f * k, GraphicsUnit.Pixel))
+            using (var subFont = new Font("Segoe UI", 12f * k, GraphicsUnit.Pixel))
+            using (var iconFont = new Font(Theme.IconFamily, 20f * k, GraphicsUnit.Pixel))
             using (var measure = new Bitmap(1, 1))
             using (var mg = Graphics.FromImage(measure))
             {
                 mg.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-                float tw = mg.MeasureString(title, titleFont).Width;
+                float tw = mg.MeasureString(title ?? "", titleFont).Width;
                 float sw = string.IsNullOrEmpty(subtitle) ? 0 : mg.MeasureString(subtitle, subFont).Width;
-                float pad = 18 * k, icon = 40 * k, shadow = 14 * k;
-                float w = Math.Max(240 * k, Math.Min(460 * k, pad + icon + Math.Max(tw, sw) + pad + 4 * k));
-                float h = (string.IsNullOrEmpty(subtitle) && progress == null ? 58 : 74) * k;
+                float pad = 20 * k, icon = 22 * k, gap = 14 * k, shadow = 14 * k;
+                bool bar = progress != null;
+                float w = bar ? 300 * k : Math.Max(220 * k, Math.Min(460 * k, pad + icon + gap + Math.Max(tw, sw) + pad + 4 * k));
+                float h = (bar || string.IsNullOrEmpty(subtitle) ? 56 : 64) * k;
                 var bmp = new Bitmap((int)Math.Ceiling(w + shadow * 2), (int)Math.Ceiling(h + shadow * 2), PixelFormat.Format32bppPArgb);
                 using (var g = Graphics.FromImage(bmp))
                 {
@@ -211,41 +215,48 @@ namespace LiteOptions.UI
                     {
                         var r = RectangleF.Inflate(box, i * 1.6f * k, i * 1.6f * k);
                         r.Offset(0, 3 * k);
-                        using (var p = Theme.Rounded(r, 10 * k + i * 1.6f * k))
+                        using (var p = Theme.Rounded(r, 8 * k + i * 1.6f * k))
                         using (var b = new SolidBrush(Color.FromArgb(dark ? 16 : 9, 0, 0, 0))) g.FillPath(b, p);
                     }
-                    using (var p = Theme.Rounded(box, 10 * k))
+                    using (var p = Theme.Rounded(box, 8 * k))
                     {
                         using (var b = new SolidBrush(bg)) g.FillPath(b, p);
                         using (var pen = new Pen(border, Math.Max(1f, k))) g.DrawPath(pen, p);
                     }
-                    var iconRect = new RectangleF(box.X + pad - 4 * k, box.Y, icon, h);
-                    using (var b = new SolidBrush(accent))
+                    var iconRect = new RectangleF(box.X + pad - 6 * k, box.Y, icon + 12 * k, h);
+                    using (var b = new SolidBrush(text))
                     using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                         g.DrawString(glyph ?? "", iconFont, b, iconRect, sf);
-                    float x = box.X + pad + icon;
-                    float textW = box.Right - pad - x;
-                    bool two = !string.IsNullOrEmpty(subtitle) || progress != null;
-                    float ty = two ? box.Y + 13 * k : box.Y + (h - titleFont.Height) / 2;
-                    using (var b = new SolidBrush(text))
-                    using (var sf = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
-                        g.DrawString(title, titleFont, b, new RectangleF(x, ty, textW, titleFont.Height + 4), sf);
-                    if (progress != null)
+                    float x = box.X + pad + icon + gap;
+                    float right = box.Right - pad;
+                    if (bar)
                     {
-                        float by = box.Y + 46 * k;
-                        using (var tp = Theme.Rounded(new RectangleF(x, by, textW, 4 * k), 2 * k))
+                        // icon · bar · value, like the volume pop-up
+                        float valueW = Math.Min(130 * k, tw + 2 * k);
+                        float barW = Math.Max(40 * k, right - x - gap - valueW);
+                        float by = box.Y + (h - 4 * k) / 2;
+                        using (var tp = Theme.Rounded(new RectangleF(x, by, barW, 4 * k), 2 * k))
                         using (var tb = new SolidBrush(track)) g.FillPath(tb, tp);
-                        float fw = Math.Max(4 * k, (float)(textW * Math.Max(0, Math.Min(1, progress.Value))));
+                        float fw = Math.Max(4 * k, (float)(barW * Math.Max(0, Math.Min(1, progress.Value))));
                         using (var fp = Theme.Rounded(new RectangleF(x, by, fw, 4 * k), 2 * k))
                         using (var fb = new SolidBrush(accent)) g.FillPath(fb, fp);
-                        if (!string.IsNullOrEmpty(subtitle))
-                            using (var b = new SolidBrush(muted))
-                                g.DrawString(subtitle, subFont, b, x + textW - mg.MeasureString(subtitle, subFont).Width + 4 * k, box.Y + 13 * k + 2 * k);
+                        using (var b = new SolidBrush(text))
+                        using (var sf = new StringFormat { Alignment = StringAlignment.Far, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
+                            g.DrawString(title ?? "", titleFont, b, new RectangleF(right - valueW - 2 * k, box.Y, valueW + 4 * k, h), sf);
                     }
-                    else if (!string.IsNullOrEmpty(subtitle))
-                        using (var b = new SolidBrush(muted))
+                    else
+                    {
+                        float textW = right - x;
+                        bool two = !string.IsNullOrEmpty(subtitle);
+                        float ty = two ? box.Y + 12 * k : box.Y + (h - titleFont.Height) / 2;
+                        using (var b = new SolidBrush(text))
                         using (var sf = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
-                            g.DrawString(subtitle, subFont, b, new RectangleF(x, box.Y + 39 * k, textW, subFont.Height + 4), sf);
+                            g.DrawString(title ?? "", titleFont, b, new RectangleF(x, ty, textW, titleFont.Height + 4), sf);
+                        if (two)
+                            using (var b = new SolidBrush(muted))
+                            using (var sf = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
+                                g.DrawString(subtitle, subFont, b, new RectangleF(x, box.Y + 33 * k, textW, subFont.Height + 4), sf);
+                    }
                 }
                 return bmp;
             }

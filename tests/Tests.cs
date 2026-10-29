@@ -154,6 +154,19 @@ namespace LiteOptions.Tests
             Check(hosts != null && hosts.Hosts.Count == 3 && hosts.Current == 1, "keyboard: 3 channels, channel 2 is this computer");
             Check(hosts != null && !hosts.Hosts[0].Paired && hosts.Hosts[1].Name == "WORK-LAPTOP", "empty channel 1, channel 2 named");
             Check(hosts != null && hosts.Hosts[2].Name == "Anna\u2019s iPhone 15 Pro Max", "long UTF-8 name read in chunks: " + hosts?.Hosts[2].Name);
+            Section("Keys the K380 switches off itself (0x4521)");
+            Check(dm.Keyboard.DisableCaps == 0x1D && kb.Disabled == 0, "capabilities read; nothing switched off while the setting is untouched");
+            s.DisabledKeys = 0x01 | 0x02; // Caps Lock, plus Num Lock which this keyboard can't do
+            dm.ApplySettingsNow(); dm.RunPendingForTests();
+            Check(kb.Disabled == 0x01 && dm.Keyboard.DisabledKeys == 0x01, "Caps Lock switched off; unsupported keys ignored");
+            kb.Disabled = 0;
+            dm.RequestPoll(); dm.RunPendingForTests();
+            Check(kb.Disabled == 0x01, "poll puts it back if the keyboard forgot");
+            s.DisabledKeys = 0;
+            dm.ApplySettingsNow(); dm.RunPendingForTests();
+            Check(kb.Disabled == 0, "unticking turns it back on");
+            s.DisabledKeys = -1;
+
             var mh = dm.Mouse.Hosts;
             Check(mh != null && mh.Hosts.Count == 3 && mh.Current == 0 && mh.Hosts[1].Unknown, "mouse without names: channel count and current channel only");
 

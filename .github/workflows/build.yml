@@ -213,10 +213,15 @@ jobs:
 
             Double-click it to install or update (your settings are kept). Windows may say "Windows protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
 
-            New in 2.1:
-            - Smooth scrolling (Mouse page): each click of the wheel glides instead of jumping. Off until you switch it on.
-            - Easy-Switch: the Mouse and Keyboard pages show what's paired on channels 1, 2 and 3, and which one is this computer.
-            - New actions for buttons and keys: mute/unmute the microphone (with a pop-up), screen brighter/dimmer (laptop screen), sleep, Windows Settings, Quick Settings, switch input language, Print Screen, Copilot, Ctrl + click and Shift + click.
-            - A pop-up when Caps Lock or Num Lock is switched on or off (can be turned off in Settings).
-            - The settings window folds its menu behind a ☰ button when it's made narrow, like Windows Settings.
-            - The keyboard picture now shows the graphite K380.
+            New in 2.2: a redesigned settings window
+            - A cleaner layout in the style of Windows 11 Settings: grouped settings, clearer headings and more breathing room.
+            - A big picture of your mouse and keyboard with labels showing what each part does. Click a label to go to that setting.
+            - Battery rings for both devices in the menu.
+            - Middle-button gestures laid out as a cross: up, down, left, right and click, each with its own action.
+            - A new action picker with search, groups and the keyboard shortcut each action uses.
+            - Search in the title bar finds any setting.
+            - New pages: App profiles (per-app settings in one place) and Pop-ups & alerts.
+            - Turn off keys: the K380 can switch off Caps Lock, Insert, Scroll Lock or the Windows key by itself.
+            - Clicking the tray icon opens a quick panel: battery, top row, smooth scrolling, pop-ups, pause and mouse sensitivity.
+            - Pop-ups look like Windows 11's own volume and brightness pop-ups.
+            - A new app icon, drawn after the Pebble Mouse 2.

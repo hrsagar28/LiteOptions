@@ -99,12 +99,13 @@ namespace LiteOptions
         [DataMember(Order = 11)] public bool SetupDone;
         [DataMember(Order = 12)] public bool LockKeyPopups = true;     // pop-up when Caps Lock / Num Lock / Scroll Lock changes
         [DataMember(Order = 13)] public bool SmoothScroll;             // turn each wheel notch into a short glide
+        [DataMember(Order = 14)] public int DisabledKeys = -1;        // keys the keyboard switches off itself (bit mask, see HidppDevice); -1 = leave alone
 
         // DataContract skips field initialisers, so set defaults for members missing from the file.
         [OnDeserializing]
         void SetDefaults(StreamingContext c)
         {
-            Version = 1; Profiles = new List<Profile>(); FnMode = "unchanged"; LowBatteryPercent = 15; Notifications = true; ShowPopups = true; LockKeyPopups = true;
+            Version = 1; Profiles = new List<Profile>(); FnMode = "unchanged"; LowBatteryPercent = 15; Notifications = true; ShowPopups = true; LockKeyPopups = true; DisabledKeys = -1;
         }
 
         public Profile Global => Profiles.First(p => p.IsGlobal);
@@ -132,6 +133,7 @@ namespace LiteOptions
             if (FnMode != "media" && FnMode != "standard") FnMode = "unchanged";
             if (MouseDpi < 0) MouseDpi = 0;
             if (LowBatteryPercent < 0 || LowBatteryPercent > 50) LowBatteryPercent = 15;
+            if (DisabledKeys < -1 || DisabledKeys > 0xFF) DisabledKeys = -1;
         }
 
         public AppSettings Clone()

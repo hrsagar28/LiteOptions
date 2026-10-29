@@ -16,7 +16,7 @@ namespace LiteOptions.SettingsApp
             Touch = "", Edit = "", Add = "", Delete = "", Refresh = "", Copy = "", Folder = "",
             Power = "", Pause = "", Info = "", Warning = "", Check = "", Speed = "", Scroll = "",
             Swap = "", Message = "", Setup = "", Diagnostic = "", Apps = "", App = "", Forward = "",
-            Record = "", Bluetooth = "", BatteryUnknown = "", Link = "", OpenFile = "", Text = "", Window = "";
+            Search = "\uE721", Menu = "\uE700", Manage = "\uE912", Alert = "\uEA8F", Scroll2 = "\uEC8F", Popup = "\uE8BD", Record = "", Bluetooth = "", BatteryUnknown = "", Link = "", OpenFile = "", Text = "", Window = "";
 
         /// <summary>Battery0..Battery10 (and the charging set).</summary>
         public static string Battery(int percent, bool charging)
@@ -29,7 +29,12 @@ namespace LiteOptions.SettingsApp
     static class Ui
     {
         public static Style Style(string key) => (Style)Application.Current.Resources[key];
-        public static Brush Brush(string key) => (Brush)Application.Current.Resources[key];
+        public static Brush Brush(string key)
+        {
+            try { if (Application.Current.Resources[key] is Brush b) return b; }
+            catch (Exception ex) { try { Logger.Write("missing brush " + key + ": " + ex.Message); } catch { } }
+            return new SolidColorBrush(Microsoft.UI.Colors.Gray);
+        }
 
         public static FontIcon Icon(string glyph, double size = 16) => new FontIcon { Glyph = glyph, FontSize = size };
 
@@ -270,6 +275,8 @@ namespace LiteOptions.SettingsApp
 
         public UIElement Control { get => right.Content as UIElement; set => right.Content = value; }
 
+        bool row;
+
         /// <summary>Indented look for cards that belong to the card above.</summary>
         public SettingCard Indent()
         {
@@ -278,13 +285,25 @@ namespace LiteOptions.SettingsApp
             return this;
         }
 
+        /// <summary>A row inside a <see cref="SettingsGroup"/>: no card of its own.</summary>
+        public SettingCard AsRow()
+        {
+            row = true;
+            var pad = Box.Padding;
+            Box.Style = Ui.Style("CardRow");
+            if (pad.Left > 40) { Box.Padding = new Thickness(56, 10, 16, 10); Box.MinHeight = 56; }
+            return this;
+        }
+
         public bool Shown { get => Visibility == Visibility.Visible; set => Visibility = value ? Visibility.Visible : Visibility.Collapsed; }
 
         public async void Flash()
         {
-            Box.Style = Ui.Style("CardFlash");
+            var pad = Box.Padding;
+            Box.Style = Ui.Style(row ? "CardRowFlash" : "CardFlash");
             await Task.Delay(1400);
-            Box.Style = Ui.Style("Card");
+            Box.Style = Ui.Style(row ? "CardRow" : "Card");
+            if (row) Box.Padding = pad;
         }
     }
 

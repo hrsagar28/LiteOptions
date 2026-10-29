@@ -20,6 +20,8 @@ namespace LiteOptions.Hid
         public bool FnSupported;
         public bool? FnMedia;
         public HostsInfo Hosts;
+        public int DisableCaps;           // keys this keyboard can switch off itself (0 = it can't)
+        public int DisabledKeys = -1;     // which are off right now (-1 unknown)
         public volatile bool Online = true;
         public int Failures;
         public string LastError;
@@ -294,6 +296,9 @@ namespace LiteOptions.Hid
             try { d.Firmware = dev.ReadFirmware(); } catch (HidppException) { }
             try { d.Battery = dev.ReadBattery(); } catch (HidppException) { }
             try { d.Hosts = dev.ReadHosts(); } catch (HidppException ex) { Logger.Write($"{d.Name}: Easy-Switch read failed: {ex.Message}"); }
+            if (dev.Has(Feature.DisableKeys))
+                try { d.DisableCaps = dev.ReadDisableKeysCapabilities(); d.DisabledKeys = dev.ReadDisabledKeys(); }
+                catch (HidppException ex) { Logger.Write($"{d.Name}: disable-keys read failed: {ex.Message}"); }
             dev.Has(Feature.WirelessStatus); // cache its index so reconnect notifications are recognised
             Logger.Write($"Connected: {d.Name} ({d.Kind}, {d.Connection}, HID++ {dev.ProtocolMajor}.{dev.ProtocolMinor}" +
                          $"{(d.Firmware != null ? ", fw " + d.Firmware : "")})" +
@@ -301,6 +306,7 @@ namespace LiteOptions.Hid
                          $"{(d.Dpi != null ? $" DPI {d.Dpi.Current} ({d.Dpi.Min}-{d.Dpi.Max})" : "")}" +
                          $"{(d.FnSupported ? $" Fn-swap 0x{dev.FnFeatureId:X4} media-first={d.FnMedia}" : "")}");
             if (d.Hosts != null) Logger.Write($"{d.Name}: Easy-Switch channels {d.Hosts.Text}");
+            if (d.DisableCaps != 0) Logger.Write($"{d.Name}: can turn off {HidppDevice.DisabledKeyNames(d.DisableCaps)}; turned off now: {HidppDevice.DisabledKeyNames(Math.Max(0, d.DisabledKeys))}");
         }
 
         /// <summary>Once per device per run: list its HID++ features in the log (helps when adding support for more of them).</summary>
@@ -360,6 +366,18 @@ namespace LiteOptions.Hid
                     d.Dpi.Current = target;
                     Logger.Write($"{d.Name}: DPI set to {target}");
                 }
+            }
+            if (d.DisableCaps != 0 && s.DisabledKeys >= 0)
+            {
+                int want = s.DisabledKeys & d.DisableCaps;
+                int cur = d.Dev.ReadDisabledKeys();
+                if (cur != want)
+                {
+                    d.Dev.WriteDisabledKeys(want);
+                    d.DisabledKeys = d.Dev.ReadDisabledKeys();
+                    Logger.Write($"{d.Name}: keys turned off: {HidppDevice.DisabledKeyNames(d.DisabledKeys)}" + (d.DisabledKeys != want ? $" (asked for {HidppDevice.DisabledKeyNames(want)})" : ""));
+                }
+                else d.DisabledKeys = cur;
             }
             if (d.Kind == DeviceKind.Keyboard && d.FnSupported && s.FnMode != "unchanged")
             {

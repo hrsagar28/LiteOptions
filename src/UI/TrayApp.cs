@@ -238,6 +238,13 @@ namespace LiteOptions.UI
 
         public MainForm Window => form;
 
+        /// <summary>Left-click on the tray icon: the quick panel (devices, top row, DPI…) from the settings app, else the window.</summary>
+        void ShowTrayFlyout()
+        {
+            if (live && HasSettingsUi && LaunchSettingsUi("--tray")) return;
+            ShowWindow();
+        }
+
         public void ShowWindow()
         {
             if (live && HasSettingsUi && LaunchSettingsUi()) return;
@@ -292,7 +299,7 @@ namespace LiteOptions.UI
             try { small = new Icon(AppIcon, SystemInformation.SmallIconSize); } catch { small = AppIcon; }
             baseTrayIcon = small;
             var icon = new NotifyIcon { Icon = small, Text = "LiteOptions", ContextMenuStrip = menu, Visible = true };
-            icon.MouseClick += (s, e) => { if (e.Button == MouseButtons.Left) ShowWindow(); };
+            icon.MouseClick += (s, e) => { if (e.Button == MouseButtons.Left) ShowTrayFlyout(); };
             return icon;
         }
 

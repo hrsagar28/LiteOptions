@@ -21,6 +21,40 @@
                 <Setter Property="MinHeight" Value="68" />
             </Style>
 
+            <!-- a group: one card holding several rows split by thin lines (Windows 11 Settings style) -->
+            <Style x:Key="Group" TargetType="Border" BasedOn="{StaticResource Card}">
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="MinHeight" Value="0" />
+            </Style>
+
+            <!-- a row inside a group: no card of its own -->
+            <Style x:Key="CardRow" TargetType="Border">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="16,12,16,12" />
+                <Setter Property="MinHeight" Value="64" />
+            </Style>
+
+            <Style x:Key="CardRowFlash" TargetType="Border" BasedOn="{StaticResource CardRow}">
+                <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource AccentFillColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="2" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="Padding" Value="14,10,14,10" />
+            </Style>
+
+            <Style x:Key="Chip" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                <Setter Property="CornerRadius" Value="12" />
+                <Setter Property="Padding" Value="10,3,10,4" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+
+            <Style x:Key="Tile" TargetType="Border" BasedOn="{StaticResource Card}">
+                <Setter Property="Padding" Value="16,14,16,14" />
+                <Setter Property="MinHeight" Value="0" />
+            </Style>
+
             <Style x:Key="CardFlash" TargetType="Border" BasedOn="{StaticResource Card}">
                 <Setter Property="BorderBrush" Value="{ThemeResource AccentFillColorDefaultBrush}" />
                 <Setter Property="BorderThickness" Value="2" />
