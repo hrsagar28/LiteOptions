@@ -31,6 +31,7 @@ namespace LiteOptions.Tests
                 SettingsRoundTrip();
                 MouseHookLogic();
                 KeyHookLogic();
+                SmoothScrolling();
                 CaptureLogic();
                 V12();
                 Misc();
@@ -148,6 +149,14 @@ namespace LiteOptions.Tests
             Check(kb.FnInv == false, "saved F-key mode applied to K380");
             Check(dm.Keyboard.Battery?.Percent == 80, "keyboard battery read");
 
+            Section("Easy-Switch channels");
+            var hosts = dm.Keyboard.Hosts;
+            Check(hosts != null && hosts.Hosts.Count == 3 && hosts.Current == 1, "keyboard: 3 channels, channel 2 is this computer");
+            Check(hosts != null && !hosts.Hosts[0].Paired && hosts.Hosts[1].Name == "WORK-LAPTOP", "empty channel 1, channel 2 named");
+            Check(hosts != null && hosts.Hosts[2].Name == "Anna\u2019s iPhone 15 Pro Max", "long UTF-8 name read in chunks: " + hosts?.Hosts[2].Name);
+            var mh = dm.Mouse.Hosts;
+            Check(mh != null && mh.Hosts.Count == 3 && mh.Current == 0 && mh.Hosts[1].Unknown, "mouse without names: channel count and current channel only");
+
             Section("Mouse power-cycles (DPI resets) and sends 'reconfigure me'");
             mouse.Dpi = 1000;
             byte ws = mouse.Features[Feature.WirelessStatus];
@@ -230,6 +239,35 @@ namespace LiteOptions.Tests
             Check(dm.Mouse != null && dm.Mouse.Dev.Index == 2, "mouse found in slot 2");
             Check(dm.Mouse?.Connection == "Logi Bolt receiver", "connection labelled Bolt");
             dm.Dispose();
+        }
+
+        static void SmoothScrolling()
+        {
+            Section("Smooth scrolling");
+            var sc = new SmoothScroller();
+            sc.Queue(120);
+            int sent = 0, steps = 0, first = 0;
+            for (int t = 0; t < 60 && sc.PendingForTests != 0; t++) { int d = sc.Step(0.005); if (d != 0) { steps++; if (first == 0) first = d; } sent += d; }
+            Check(sent == 120, "one wheel click arrives in full: " + sent);
+            Check(steps >= 8 && first < 30, $"spread over small steps ({steps} steps, first {first})");
+            sc.Queue(-120); sc.Queue(-120);
+            int back = 0; for (int t = 0; t < 80; t++) back += sc.Step(0.005);
+            Check(back == -240, "two quick clicks the other way add up: " + back);
+            sc.Queue(120); sc.Step(0.005); sc.Queue(-120);
+            int after = 0; for (int t = 0; t < 80; t++) after += sc.Step(0.005);
+            Check(after == -120, "reversing drops the rest of the old glide: " + after);
+
+            var hooks = new InputHooks();
+            var cfg = NewSettings(); cfg.SmoothScroll = true; hooks.Update(cfg);
+            hooks.Smooth.Output = _ => { };
+            Check(hooks.HandleMouse(0x020A, 0, 0, 0, 120), "notched wheel click taken over when smooth scrolling is on");
+            Check(!hooks.HandleMouse(0x020A, 0, 0, 0, 30), "touchpad-sized steps pass straight through");
+            hooks.HandleKey(0xA2, true);
+            Check(!hooks.HandleMouse(0x020A, 0, 0, 0, 120), "Ctrl + wheel (zoom) passes straight through");
+            hooks.HandleKey(0xA2, false);
+            cfg.SmoothScroll = false; hooks.Update(cfg);
+            Check(!hooks.HandleMouse(0x020A, 0, 0, 0, 120), "off by default: wheel untouched");
+            hooks.Smooth.Dispose();
         }
 
         static void SettingsRoundTrip()

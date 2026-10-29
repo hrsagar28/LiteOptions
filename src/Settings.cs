@@ -97,12 +97,14 @@ namespace LiteOptions
         [DataMember(Order = 9)] public int ReverseScrollPid;           // set while we have reversed a mouse's wheel in Windows
         [DataMember(Order = 10)] public bool ShowPopups = true;
         [DataMember(Order = 11)] public bool SetupDone;
+        [DataMember(Order = 12)] public bool LockKeyPopups = true;     // pop-up when Caps Lock / Num Lock / Scroll Lock changes
+        [DataMember(Order = 13)] public bool SmoothScroll;             // turn each wheel notch into a short glide
 
         // DataContract skips field initialisers, so set defaults for members missing from the file.
         [OnDeserializing]
         void SetDefaults(StreamingContext c)
         {
-            Version = 1; Profiles = new List<Profile>(); FnMode = "unchanged"; LowBatteryPercent = 15; Notifications = true; ShowPopups = true;
+            Version = 1; Profiles = new List<Profile>(); FnMode = "unchanged"; LowBatteryPercent = 15; Notifications = true; ShowPopups = true; LockKeyPopups = true;
         }
 
         public Profile Global => Profiles.First(p => p.IsGlobal);

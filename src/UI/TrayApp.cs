@@ -64,7 +64,9 @@ namespace LiteOptions.UI
                     if (switches) System.Threading.Tasks.Task.Delay(350).ContinueWith(_ => ui.Post(__ => Osd.Show(glyph, text), null));
                     else ui.Post(_ => Osd.Show(glyph, text), null);
                 };
-                ActionRunner.AppCommand = cmd => ui.Post(_ => AppCommand(cmd), null);
+                // Caps Lock & co. change state as the key goes down; by the time it's released (plus a moment) Windows has the new state
+                Hooks.LockKey += vk => System.Threading.Tasks.Task.Delay(80).ContinueWith(_ => ui.Post(__ => ShowLockKey(vk), null));
+                ActionRunner.AppCommand = cmd => { if (!RunSystemCommand(cmd)) ui.Post(_ => AppCommand(cmd), null); };
                 ActionRunner.Start();
                 Hooks.Start();
             }
@@ -130,6 +132,41 @@ namespace LiteOptions.UI
                 case "pause_toggle": TogglePause(); break;
                 case "open": ShowWindow(); break;
             }
+        }
+
+        /// <summary>Microphone, brightness and sleep: Windows calls made on the action thread, then a pop-up. False for other commands.</summary>
+        bool RunSystemCommand(string cmd)
+        {
+            SystemActions.Result r;
+            string icon;
+            try
+            {
+                switch (cmd)
+                {
+                    case "mic_mute": r = SystemActions.ToggleMic(); icon = r.Muted ? Theme.IcMicOff : Theme.IcMic; break;
+                    case "brightness_up": r = SystemActions.StepBrightness(true); icon = Theme.IcBrightness; break;
+                    case "brightness_down": r = SystemActions.StepBrightness(false); icon = Theme.IcBrightness; break;
+                    case "sleep": SystemActions.Sleep(); return true;
+                    default: return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Write(cmd + " failed: " + ex.Message);
+                r = new SystemActions.Result { Title = "Couldn't do that", Subtitle = ex.Message };
+                icon = Theme.IcWarning;
+            }
+            ui.Post(_ => Osd.Show(icon, r.Title, r.Subtitle, r.Level), null);
+            return true;
+        }
+
+        void ShowLockKey(int vk)
+        {
+            if (!Settings.LockKeyPopups) return;
+            var key = vk == Vk.CapsLock ? Keys.CapsLock : vk == Vk.NumLock ? Keys.NumLock : Keys.Scroll;
+            bool on = Control.IsKeyLocked(key);
+            string name = vk == Vk.CapsLock ? "Caps Lock" : vk == Vk.NumLock ? "Num Lock" : "Scroll Lock";
+            Osd.Show(Theme.IcKeyboard, name + (on ? " on" : " off"), vk == Vk.CapsLock && on ? "Letters type in capitals" : null);
         }
 
         public void ToggleFn()

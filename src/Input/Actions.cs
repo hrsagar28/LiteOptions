@@ -11,7 +11,7 @@ namespace LiteOptions.Input
     {
         public string Id, Label, Group;
         public int Mods, Vk;           // keyboard shortcut presets
-        public string Mouse;           // "middle" | "back" | "forward" | "left" | "right" | "double"
+        public string Mouse;           // "middle" | "back" | "forward" | "left" | "right" | "double" | "ctrl_left" | "shift_left"
         public string Special;         // "lock" | "calc"
         public bool Repeats;           // auto-repeat while a key is held
     }
@@ -27,6 +27,8 @@ namespace LiteOptions.Input
             P("forward", "Forward", "Mouse", mouse: "forward"),
             P("double_click", "Double click", "Mouse", mouse: "double"),
             P("right_click", "Right click", "Mouse", mouse: "right"),
+            P("ctrl_click", "Ctrl + click", "Mouse", mouse: "ctrl_left"),
+            P("shift_click", "Shift + click", "Mouse", mouse: "shift_left"),
 
             P("task_view", "Task View", "Windows", W, Vk.Tab),
             P("show_desktop", "Show desktop", "Windows", W, Vk.D),
@@ -43,8 +45,17 @@ namespace LiteOptions.Input
             P("minimize", "Minimise window", "Windows", W, Vk.Down),
             P("maximize", "Maximise window", "Windows", W, Vk.Up),
             P("close_window", "Close window (Alt+F4)", "Windows", A, Vk.F4),
+            P("settings", "Windows Settings", "Windows", W, Vk.I),
+            P("quick_settings", "Quick Settings (Wi-Fi, volume, brightness)", "Windows", W, Vk.A),
+            P("input_language", "Switch input language", "Windows", W, Vk.Space),
+            P("print_screen", "Print Screen", "Windows", 0, Vk.PrintScreen),
+            P("copilot", "Copilot", "Windows", W | S, Vk.F23),
             P("lock", "Lock PC", "Windows", special: "lock"),
+            P("sleep", "Sleep", "Windows", special: "app:sleep"),
             P("calc", "Calculator", "Windows", special: "calc"),
+
+            P("brightness_up", "Screen brighter", "Screen", special: "app:brightness_up", repeats: true),
+            P("brightness_down", "Screen dimmer", "Screen", special: "app:brightness_down", repeats: true),
 
             P("fn_toggle", "Switch top row (media keys / F1–F12)", "LiteOptions", special: "app:fn_toggle"),
             P("pause_toggle", "Pause or resume remapping", "LiteOptions", special: "app:pause_toggle"),
@@ -78,6 +89,7 @@ namespace LiteOptions.Input
             P("mute", "Mute", "Media", 0, Vk.VolumeMute),
             P("vol_up", "Volume up", "Media", 0, Vk.VolumeUp, repeats: true),
             P("vol_down", "Volume down", "Media", 0, Vk.VolumeDown, repeats: true),
+            P("mic_mute", "Mute / unmute microphone", "Media", special: "app:mic_mute"),
         };
 
         static readonly Dictionary<string, Preset> byId = All.ToDictionary(p => p.Id);
@@ -120,9 +132,9 @@ namespace LiteOptions.Input
     {
         public const int Back = 0x08, Tab = 0x09, Enter = 0x0D, Shift = 0x10, Control = 0x11, Menu = 0x12, Pause = 0x13, CapsLock = 0x14,
             Escape = 0x1B, Space = 0x20, PageUp = 0x21, PageDown = 0x22, End = 0x23, Home = 0x24, Left = 0x25, Up = 0x26, Right = 0x27, Down = 0x28,
-            PrintScreen = 0x2C, Insert = 0x2D, Delete = 0x2E, D0 = 0x30, A = 0x41, C = 0x43, D = 0x44, E = 0x45, F = 0x46, H = 0x48, N = 0x4E,
+            PrintScreen = 0x2C, Insert = 0x2D, Delete = 0x2E, D0 = 0x30, A = 0x41, C = 0x43, D = 0x44, E = 0x45, F = 0x46, H = 0x48, I = 0x49, N = 0x4E,
             P = 0x50, S = 0x53, T = 0x54, V = 0x56, W = 0x57, X = 0x58, Y = 0x59, Z = 0x5A,
-            LWin = 0x5B, RWin = 0x5C, Apps = 0x5D, F1 = 0x70, F4 = 0x73, F5 = 0x74, F24 = 0x87, NumLock = 0x90, ScrollLock = 0x91,
+            LWin = 0x5B, RWin = 0x5C, Apps = 0x5D, F1 = 0x70, F4 = 0x73, F5 = 0x74, F23 = 0x86, F24 = 0x87, NumLock = 0x90, ScrollLock = 0x91,
             LShift = 0xA0, RShift = 0xA1, LControl = 0xA2, RControl = 0xA3, LMenu = 0xA4, RMenu = 0xA5,
             BrowserBack = 0xA6, BrowserForward = 0xA7, BrowserRefresh = 0xA8, BrowserStop = 0xA9, BrowserSearch = 0xAA, BrowserFavorites = 0xAB, BrowserHome = 0xAC,
             VolumeMute = 0xAD, VolumeDown = 0xAE, VolumeUp = 0xAF, MediaNext = 0xB0, MediaPrev = 0xB1, MediaStop = 0xB2, MediaPlayPause = 0xB3,
@@ -295,6 +307,13 @@ namespace LiteOptions.Input
                 case "double": Btn(Native.MOUSEEVENTF_LEFTDOWN, Native.MOUSEEVENTF_LEFTUP); Btn(Native.MOUSEEVENTF_LEFTDOWN, Native.MOUSEEVENTF_LEFTUP); break;
                 case "back": Btn(Native.MOUSEEVENTF_XDOWN, Native.MOUSEEVENTF_XUP, Native.XBUTTON1); break;
                 case "forward": Btn(Native.MOUSEEVENTF_XDOWN, Native.MOUSEEVENTF_XUP, Native.XBUTTON2); break;
+                case "ctrl_left":
+                case "shift_left":
+                    int mod = which == "ctrl_left" ? Vk.LControl : Vk.LShift;
+                    Key(list, mod, false);
+                    Btn(Native.MOUSEEVENTF_LEFTDOWN, Native.MOUSEEVENTF_LEFTUP);
+                    Key(list, mod, true);
+                    break;
             }
             Send(list);
         }

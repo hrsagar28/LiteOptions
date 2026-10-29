@@ -213,9 +213,10 @@ jobs:
 
             Double-click it to install or update (your settings are kept). Windows may say "Windows protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
 
-            Fixed in 2.0.1:
-            - The K380's top row is set again a few seconds after the keyboard wakes up. Before, it could stay on media keys until the next 5-minute check.
-            - Ctrl + Esc fixes a keyboard that's out of step with your setting in one press.
-            - Battery levels are shown as a small drawn battery (green, amber when low, red when very low).
-            - On-screen pop-ups now appear on every screen, and come back on top if something else had covered them.
-            - The settings window shows a spinner instead of "No mouse found" while it starts, keeps the device name readable in a narrow window, and the DPI slider works with the arrow keys.
+            New in 2.1:
+            - Smooth scrolling (Mouse page): each click of the wheel glides instead of jumping. Off until you switch it on.
+            - Easy-Switch: the Mouse and Keyboard pages show what's paired on channels 1, 2 and 3, and which one is this computer.
+            - New actions for buttons and keys: mute/unmute the microphone (with a pop-up), screen brighter/dimmer (laptop screen), sleep, Windows Settings, Quick Settings, switch input language, Print Screen, Copilot, Ctrl + click and Shift + click.
+            - A pop-up when Caps Lock or Num Lock is switched on or off (can be turned off in Settings).
+            - The settings window folds its menu behind a ☰ button when it's made narrow, like Windows Settings.
+            - The keyboard picture now shows the graphite K380.

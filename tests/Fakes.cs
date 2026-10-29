@@ -21,6 +21,8 @@ namespace LiteOptions.Tests
         public bool Asleep;
         public int Requests;
         public int DropFnWrites; // ignore this many "set Fn mode" requests, like a keyboard that has only just woken up
+        public readonly List<FakeHost> Hosts = new List<FakeHost>();
+        public int CurrentHost;
 
         public static FakeDevice PebbleM350s()
         {
@@ -37,6 +39,11 @@ namespace LiteOptions.Tests
             d.Features[Feature.FeatureSet] = 1; d.Features[Feature.FwVersion] = 2; d.Features[Feature.DeviceName] = 3;
             d.Features[Feature.BatteryStatus] = 4; d.Features[Feature.ChangeHost] = 5; d.Features[Feature.WirelessStatus] = 6;
             d.Features[Feature.FnInversion] = 0x0B; // the index k380_conf.c hard-codes
+            d.Features[Feature.HostsInfo] = 7;
+            d.Hosts.Add(new FakeHost());
+            d.Hosts.Add(new FakeHost { Paired = true, Name = "WORK-LAPTOP" });
+            d.Hosts.Add(new FakeHost { Paired = true, Name = "Anna\u2019s iPhone 15 Pro Max" }); // longer than one 14-byte chunk, with a 3-byte character
+            d.CurrentHost = 1;
             return d;
         }
 
@@ -85,6 +92,32 @@ namespace LiteOptions.Tests
                     if (fn == 2) return new byte[] { 0, (byte)(Dpi >> 8), (byte)Dpi, (byte)(DpiDefault >> 8), (byte)DpiDefault };
                     if (fn == 3) { Dpi = (p[1] << 8) | p[2]; return new byte[] { 0, p[1], p[2] }; }
                     break;
+                case Feature.FeatureSet:
+                    if (fn == 0) return new[] { (byte)Features.Count };
+                    if (fn == 1)
+                    {
+                        ushort id = Features.Where(kv => kv.Value == p[0]).Select(kv => kv.Key).FirstOrDefault();
+                        return new byte[] { (byte)(id >> 8), (byte)id, 0 };
+                    }
+                    break;
+                case Feature.ChangeHost:
+                    if (fn == 0) return new byte[] { 3, (byte)CurrentHost, 0 };
+                    break;
+                case Feature.HostsInfo:
+                    if (fn == 0) return new byte[] { 0x01, 0, (byte)Hosts.Count, (byte)CurrentHost };
+                    if (fn == 1 && p[0] < Hosts.Count)
+                    {
+                        var h = Hosts[p[0]];
+                        return new byte[] { p[0], (byte)(h.Paired ? 1 : 0), 2, 1, (byte)Encoding.UTF8.GetByteCount(h.Name), 24 };
+                    }
+                    if (fn == 3 && p[0] < Hosts.Count)
+                    {
+                        var nb = Encoding.UTF8.GetBytes(Hosts[p[0]].Name);
+                        var r = new byte[16]; r[0] = p[0]; r[1] = p[1];
+                        if (p[1] < nb.Length) Array.Copy(nb, p[1], r, 2, Math.Min(14, nb.Length - p[1]));
+                        return r;
+                    }
+                    break;
                 case Feature.FnInversion:
                     if (fn == 0) return new byte[] { (byte)(FnInv ? 1 : 0) };
                     if (fn == 1) { FnInv = p[0] != 0; return new byte[] { p[0] }; }
@@ -94,6 +127,8 @@ namespace LiteOptions.Tests
             return null;
         }
     }
+
+    class FakeHost { public bool Paired; public string Name = ""; }
 
     /// <summary>A link with one direct device (index 0xFF) or a receiver with devices in slots.</summary>
     class FakeLink : IHidLink

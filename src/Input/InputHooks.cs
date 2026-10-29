@@ -19,11 +19,11 @@ namespace LiteOptions.Input
         public Dictionary<string, Middle> AppMiddle = new Dictionary<string, Middle>();
         public Dictionary<int, ActionSpec> GlobalKeys = new Dictionary<int, ActionSpec>();
         public Dictionary<string, Dictionary<int, ActionSpec>> AppKeys = new Dictionary<string, Dictionary<int, ActionSpec>>();
-        public bool Paused;
+        public bool Paused, SmoothScroll;
 
         public static RemapConfig From(AppSettings s)
         {
-            var c = new RemapConfig { Paused = s.Paused };
+            var c = new RemapConfig { Paused = s.Paused, SmoothScroll = s.SmoothScroll };
             c.GlobalMiddle = MiddleOf(s.Global);
             foreach (var b in s.Global.Keys) c.GlobalKeys[b.TriggerId] = b.Action;
             foreach (var p in s.Profiles.Where(p => !p.IsGlobal))
@@ -70,6 +70,7 @@ namespace LiteOptions.Input
         public string ForegroundApp { get; internal set; }
 
         // mouse state (hook thread only)
+        internal readonly SmoothScroller Smooth = new SmoothScroller();
         bool middleSwallowed;
         bool gestureActive;
         RemapConfig.Middle gestureCfg;
@@ -90,6 +91,9 @@ namespace LiteOptions.Input
 
         /// <summary>Raised on the hook thread after a gesture: direction ("up", "down", "left", "right") and the action run.</summary>
         public event Action<string, ActionSpec> Gesture;
+
+        /// <summary>Raised on the hook thread when Caps Lock, Num Lock or Scroll Lock is released (and wasn't remapped).</summary>
+        public event Action<int> LockKey;
 
         public InputHooks()
         {
@@ -218,7 +222,8 @@ namespace LiteOptions.Input
                     int msg = (int)wParam;
                     var info = (Native.MSLLHOOKSTRUCT*)lParam;
                     bool injected = (info->flags & Native.LLMHF_INJECTED) != 0;
-                    if (!injected && HandleMouse(msg, info->pt.X, info->pt.Y, info->time))
+                    int wheel = msg == Native.WM_MOUSEWHEEL ? (short)(info->mouseData >> 16) : 0;
+                    if (!injected && HandleMouse(msg, info->pt.X, info->pt.Y, info->time, wheel))
                         return (IntPtr)1;
                 }
                 catch (Exception ex) { Logger.Write("mouse hook: " + ex.Message); }
@@ -227,8 +232,18 @@ namespace LiteOptions.Input
         }
 
         /// <summary>Returns true to swallow the event.</summary>
-        internal bool HandleMouse(int msg, int x, int y, uint time)
+        internal bool HandleMouse(int msg, int x, int y, uint time, int wheel = 0)
         {
+            if (msg == Native.WM_MOUSEWHEEL)
+            {
+                // Smooth scrolling: only whole clicks of a notched wheel (touchpads and free-spinning wheels already send
+                // small steps), and not with Ctrl/Shift/Alt held, where apps zoom or scroll sideways once per message.
+                var c = config;
+                if (!c.SmoothScroll || c.Paused || wheel == 0 || wheel % 120 != 0 || physicalMods != Mods.None) return false;
+                Smooth.Add(wheel);
+                return true;
+            }
+
             if (msg == Native.WM_MOUSEMOVE)
             {
                 if (!gestureActive) return false;
@@ -300,8 +315,11 @@ namespace LiteOptions.Input
                     {
                         int msg = (int)wParam;
                         bool down = msg == Native.WM_KEYDOWN || msg == Native.WM_SYSKEYDOWN;
-                        if (HandleKey((int)info->vkCode, down))
+                        int vk = (int)info->vkCode;
+                        if (HandleKey(vk, down))
                             return (IntPtr)1;
+                        if (!down && (vk == Vk.CapsLock || vk == Vk.NumLock || vk == Vk.ScrollLock))
+                            try { LockKey?.Invoke(vk); } catch { }
                     }
                 }
                 catch (Exception ex) { Logger.Write("keyboard hook: " + ex.Message); }
@@ -395,6 +413,7 @@ namespace LiteOptions.Input
         {
             if (threadId != 0) Native.PostThreadMessage(threadId, Native.WM_QUIT, IntPtr.Zero, IntPtr.Zero);
             thread?.Join(1000);
+            Smooth.Dispose();
         }
     }
 }

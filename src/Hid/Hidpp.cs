@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading;
 
@@ -148,6 +149,23 @@ namespace LiteOptions.Hid
             : (string.IsNullOrEmpty(Level) ? "unknown" : Level) + (Charging ? " (charging)" : "");
     }
 
+    /// <summary>One Easy-Switch channel. Index is 0-based (the device's buttons say 1, 2, 3).</summary>
+    public sealed class HostInfo
+    {
+        public int Index;
+        public bool Paired;
+        public bool Unknown;          // the device can't say whether anything is paired here
+        public string Name = "";
+    }
+
+    public sealed class HostsInfo
+    {
+        public int Current = -1;
+        public List<HostInfo> Hosts = new List<HostInfo>();
+        public string Text => string.Join(", ", Hosts.Select(h => (h.Index + 1) + " " +
+            (h.Index == Current ? (h.Name.Length > 0 ? h.Name : "paired") + " (this one)" : h.Unknown ? "?" : !h.Paired ? "empty" : h.Name.Length > 0 ? h.Name : "paired")));
+    }
+
     public sealed class DpiInfo
     {
         public int Current, Default;
@@ -248,6 +266,66 @@ namespace LiteOptions.Hid
                 return $"{prefix} {r[4]:X2}.{r[5]:X2}.B{r[6]:X2}{r[7]:X2}";
             }
             return null;
+        }
+
+        /// <summary>Every feature id the device offers, in its own order (for the log).</summary>
+        public List<ushort> ReadFeatureIds()
+        {
+            var ids = new List<ushort>();
+            int count = Call(Feature.FeatureSet, 0)[0];
+            for (int i = 1; i <= count && i < 64; i++)
+            {
+                var r = Call(Feature.FeatureSet, 1, (byte)i);
+                ids.Add((ushort)((r[0] << 8) | r[1]));
+            }
+            return ids;
+        }
+
+        // ── Easy-Switch channels (0x1815 hosts info, falling back to 0x1814 change host) ──
+        public HostsInfo ReadHosts()
+        {
+            if (Has(Feature.HostsInfo))
+            {
+                var r = Call(Feature.HostsInfo, 0);
+                var info = new HostsInfo { Current = r[3] };
+                bool names = (r[0] & 0x01) != 0;
+                int count = Math.Min((int)r[2], 8);
+                for (int h = 0; h < count; h++)
+                {
+                    var host = new HostInfo { Index = h };
+                    try
+                    {
+                        var d = Call(Feature.HostsInfo, 1, (byte)h);
+                        host.Paired = d[1] != 0;
+                        if (names && host.Paired && d[4] > 0) host.Name = ReadHostName(h, d[4]);
+                    }
+                    catch (HidppException) { host.Paired = h == info.Current; }
+                    info.Hosts.Add(host);
+                }
+                return info;
+            }
+            if (Has(Feature.ChangeHost))
+            {
+                var r = Call(Feature.ChangeHost, 0);
+                var info = new HostsInfo { Current = r[1] };
+                for (int h = 0; h < Math.Min((int)r[0], 8); h++) info.Hosts.Add(new HostInfo { Index = h, Paired = h == r[1], Unknown = h != r[1] });
+                return info;
+            }
+            return null;
+        }
+
+        string ReadHostName(int host, int length)
+        {
+            var bytes = new List<byte>();
+            int guard = 0;
+            while (bytes.Count < length && guard++ < 8)
+            {
+                var p = Call(Feature.HostsInfo, 3, (byte)host, (byte)bytes.Count);
+                int n = Math.Min(length - bytes.Count, p.Length - 2);
+                if (n <= 0) break;
+                for (int i = 0; i < n; i++) bytes.Add(p[2 + i]);
+            }
+            return Encoding.UTF8.GetString(bytes.ToArray()).Trim('\0', ' ');
         }
 
         // ── battery ──

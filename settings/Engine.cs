@@ -127,11 +127,13 @@ namespace LiteOptions.SettingsApp
         {
             new DeviceDto { Key = "demo-mouse", Name = "Pebble Mouse 2 M350s", Kind = "Mouse", Connection = "Bluetooth", Pid = 0xB03A, Online = true,
                 Firmware = "RQM 40.02.B0017", HasBattery = true, BatteryPercent = 80, BatteryLevel = "Good",
-                DpiMin = 400, DpiMax = 4000, DpiStep = 100, DpiCurrent = 1000, DpiDefault = 1000 },
+                DpiMin = 400, DpiMax = 4000, DpiStep = 100, DpiCurrent = 1000, DpiDefault = 1000,
+                CurrentHost = 2, Hosts = new List<HostDto> { new HostDto { Number = 1, Paired = true, Name = "Pixel 8" }, new HostDto { Number = 2, Paired = true, Name = "DESKTOP-OFFICE" }, new HostDto { Number = 3, Paired = true, Name = "WORK-LAPTOP" } } },
             new DeviceDto { Key = "demo-kb", Name = "Keyboard K380", Kind = "Keyboard", Connection = "Bluetooth", Pid = 0xB342, Online = true,
-                HasBattery = true, BatteryPercent = -1, BatteryLevel = "Good", FnSupported = true, FnMedia = 0 },
+                HasBattery = true, BatteryPercent = -1, BatteryLevel = "Good", FnSupported = true, FnMedia = 0,
+                CurrentHost = 1, Hosts = new List<HostDto> { new HostDto { Number = 1 }, new HostDto { Number = 2, Paired = true, Name = "WORK-LAPTOP" }, new HostDto { Number = 3, Paired = true, Name = "iPhone" } } },
         };
-        readonly SystemDto system = new SystemDto { Version = "2.0.0", Installed = true, PointerSpeed = 10, Precision = true, WheelLines = 3, Startup = true, ReverseScroll = 0, Architecture = RuntimeInformation.ProcessArchitecture.ToString() };
+        readonly SystemDto system = new SystemDto { Version = "2.1.0", Installed = true, PointerSpeed = 10, Precision = true, WheelLines = 3, Startup = true, ReverseScroll = 0, Architecture = RuntimeInformation.ProcessArchitecture.ToString() };
 
         public bool Connected { get; private set; }
         public event Action<bool> ConnectionChanged;

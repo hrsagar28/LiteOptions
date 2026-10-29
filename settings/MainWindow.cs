@@ -31,7 +31,11 @@ namespace LiteOptions.SettingsApp
         readonly InfoBar engineBar;
         readonly StackPanel deviceStatus;
         readonly ProgressRing loadingRing;
-        bool revealed;
+        readonly Button paneButton;
+        readonly Image logo;
+        bool revealed, narrow, paneModeSet;
+        /// <summary>Window widths (in effective pixels) below this hide the menu behind ☰, as Windows Settings does.</summary>
+        internal const double NarrowWidth = 1000;
         internal readonly MousePage MousePage;
         internal readonly KeyboardPage KeysPage;
         internal readonly SettingsPage SettingsPage;
@@ -52,13 +56,29 @@ namespace LiteOptions.SettingsApp
             else if (DesktopAcrylicController.IsSupported()) SystemBackdrop = new DesktopAcrylicBackdrop();
             else root.Background = Ui.Brush("SolidBackgroundFillColorBaseBrush");
 
-            // ── title bar ──
+            // ── title bar: [☰ when narrow] [logo  LiteOptions ........ drag area] ──
+            paneButton = new Button
+            {
+                Content = new FontIcon { Glyph = "", FontSize = 16 },
+                Width = 40, Height = 36, Padding = new Thickness(0), Margin = new Thickness(4, 0, 0, 0),
+                Background = new SolidColorBrush(Colors.Transparent), BorderThickness = new Thickness(0),
+                VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed
+            };
+            ToolTipService.SetToolTip(paneButton, "Show or hide the menu");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(paneButton, "Menu");
+            paneButton.Click += (s, e) => nav.IsPaneOpen = !nav.IsPaneOpen;
             var titleBar = new Grid { Height = 48, Background = new SolidColorBrush(Colors.Transparent) };
-            var logo = new Image { Width = 18, Height = 18, Margin = new Thickness(16, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
+            logo = new Image { Width = 18, Height = 18, Margin = new Thickness(16, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
             try { logo.Source = new BitmapImage(new Uri(Path.Combine(AppContext.BaseDirectory, "logo.png"))); } catch { }
             var appName = new TextBlock { Text = "LiteOptions", Style = Ui.Style("CaptionTextBlockStyle"), VerticalAlignment = VerticalAlignment.Center };
             titleBar.Children.Add(Ui.Row(0, logo, appName));
-            root.Children.Add(titleBar);
+            var titleRow = new Grid();
+            titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            Grid.SetColumn(titleBar, 1);
+            titleRow.Children.Add(paneButton);
+            titleRow.Children.Add(titleBar);
+            root.Children.Add(titleRow);
 
             // ── pages ──
             MousePage = new MousePage(store);
@@ -125,13 +145,19 @@ namespace LiteOptions.SettingsApp
             nav.MenuItems.Add(navMouse);
             nav.MenuItems.Add(navKeys);
             nav.FooterMenuItems.Add(navSettings);
-            nav.SelectionChanged += (s, e) => ShowPage((e.SelectedItem as NavigationViewItem)?.Tag as string);
+            nav.SelectionChanged += (s, e) =>
+            {
+                ShowPage((e.SelectedItem as NavigationViewItem)?.Tag as string);
+                if (narrow) nav.IsPaneOpen = false; // the pane floats over the page when narrow: get it out of the way
+            };
             Grid.SetRow(nav, 1);
             root.Children.Add(nav);
 
             Content = root;
             SetTitleBar(titleBar);
             root.Loaded += (s, e) => Ui.Root = root.XamlRoot;
+            // Like Windows Settings: below a certain width the menu folds away behind a ☰ button in the title bar
+            root.SizeChanged += (s, e) => UpdatePaneMode(e.NewSize.Width);
 
             try
             {
@@ -323,6 +349,32 @@ namespace LiteOptions.SettingsApp
         }
 
         // ───────────── window ─────────────
+
+        /// <summary>Wide: the menu sits on the left. Narrow: it folds away and ☰ in the title bar slides it over the page.</summary>
+        void UpdatePaneMode(double width)
+        {
+            bool now = width < NarrowWidth;
+            if (paneModeSet && now == narrow) return;
+            paneModeSet = true;
+            narrow = now;
+            nav.PaneDisplayMode = narrow ? NavigationViewPaneDisplayMode.LeftMinimal : NavigationViewPaneDisplayMode.Left;
+            nav.IsPaneOpen = !narrow;
+            paneButton.Visibility = narrow ? Visibility.Visible : Visibility.Collapsed;
+            logo.Margin = new Thickness(narrow ? 8 : 16, 0, 12, 0);
+        }
+
+        internal bool IsNarrow => narrow;
+
+        /// <summary>For screenshots: open or close the menu while narrow.</summary>
+        internal void SetPaneOpen(bool open) { if (narrow) nav.IsPaneOpen = open; }
+
+        /// <summary>For screenshots: resize the window to a size in effective pixels.</summary>
+        internal void ResizeTo(double width, double height)
+        {
+            double scale = Math.Max(1.0, W32.GetDpiForWindow(Hwnd) / 96.0);
+            var pos = AppWindow.Position;
+            AppWindow.MoveAndResize(new RectInt32(pos.X, pos.Y, (int)(width * scale), (int)(height * scale)));
+        }
 
         public void BringToFront()
         {

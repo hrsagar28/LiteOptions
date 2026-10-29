@@ -19,6 +19,7 @@ namespace LiteOptions.Hid
         public DpiInfo Dpi;
         public bool FnSupported;
         public bool? FnMedia;
+        public HostsInfo Hosts;
         public volatile bool Online = true;
         public int Failures;
         public string LastError;
@@ -74,6 +75,7 @@ namespace LiteOptions.Hid
         Thread worker;
         Timer pollTimer, reviveTimer, scanDebounce;
         readonly HashSet<string> quietKeys = new HashSet<string>(); // avoid repeating the same log line every retry
+        readonly HashSet<string> featuresLogged = new HashSet<string>();
         volatile bool disposed;
         int pendingDpi = -1;
         string lastEnumSignature = "";
@@ -82,6 +84,8 @@ namespace LiteOptions.Hid
         public TimeSpan PollInterval = TimeSpan.FromMinutes(5);
         /// <summary>A device that has just woken up often ignores the first request. Retry applying settings after these delays.</summary>
         public int[] ApplyRetryDelaysMs = { 2000, 5000, 12000 };
+        /// <summary>Write each device's HID++ feature list to the log once (off in tests).</summary>
+        public bool LogFeatureLists = true;
         public List<string> LastEnumeration { get; private set; } = new List<string>();
 
         public DeviceManager(IDeviceSource source, Func<AppSettings> getSettings)
@@ -258,6 +262,7 @@ namespace LiteOptions.Hid
                 lock (stateLock) g.Devices.Add(d);
                 ApplyFresh(d);
                 RaiseChanged();
+                if (LogFeatureLists) Post(() => { if (Snapshot().Contains(d)) LogFeatures(d); });
             }
         }
 
@@ -288,12 +293,22 @@ namespace LiteOptions.Hid
             if (d.FnSupported) try { d.FnMedia = dev.ReadFnInversion(); } catch (HidppException) { }
             try { d.Firmware = dev.ReadFirmware(); } catch (HidppException) { }
             try { d.Battery = dev.ReadBattery(); } catch (HidppException) { }
+            try { d.Hosts = dev.ReadHosts(); } catch (HidppException ex) { Logger.Write($"{d.Name}: Easy-Switch read failed: {ex.Message}"); }
             dev.Has(Feature.WirelessStatus); // cache its index so reconnect notifications are recognised
             Logger.Write($"Connected: {d.Name} ({d.Kind}, {d.Connection}, HID++ {dev.ProtocolMajor}.{dev.ProtocolMinor}" +
                          $"{(d.Firmware != null ? ", fw " + d.Firmware : "")})" +
                          $"{(d.Battery != null ? " battery " + d.Battery.Text : "")}" +
                          $"{(d.Dpi != null ? $" DPI {d.Dpi.Current} ({d.Dpi.Min}-{d.Dpi.Max})" : "")}" +
                          $"{(d.FnSupported ? $" Fn-swap 0x{dev.FnFeatureId:X4} media-first={d.FnMedia}" : "")}");
+            if (d.Hosts != null) Logger.Write($"{d.Name}: Easy-Switch channels {d.Hosts.Text}");
+        }
+
+        /// <summary>Once per device per run: list its HID++ features in the log (helps when adding support for more of them).</summary>
+        void LogFeatures(LogiDevice d)
+        {
+            if (!featuresLogged.Add(d.Key + "|" + d.Name)) return;
+            try { Logger.Write($"{d.Name}: features " + string.Join(" ", d.Dev.ReadFeatureIds().Select(f => f.ToString("X4")))); }
+            catch (HidppException ex) { Logger.Write($"{d.Name}: feature list unavailable ({ex.Message})"); }
         }
 
         /// <summary>Apply settings after a (re)connect or a settings change, with a few quick retries if the device isn't ready yet.</summary>

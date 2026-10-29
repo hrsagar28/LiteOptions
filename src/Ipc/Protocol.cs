@@ -50,8 +50,19 @@ namespace LiteOptions.Ipc
         [DataMember] public bool FnSupported;
         [DataMember] public int FnMedia = -1;            // -1 unknown, 0 F-keys first, 1 media first
         [DataMember] public string LastError = "";
+        [DataMember] public List<HostDto> Hosts;        // Easy-Switch channels; null = the device doesn't say
+        [DataMember] public int CurrentHost = -1;        // 0-based
 
         public string BatteryText => !HasBattery ? "" : BatteryPercent >= 0 ? BatteryPercent + "%" : BatteryLevel;
+    }
+
+    [DataContract]
+    public sealed class HostDto
+    {
+        [DataMember] public int Number;      // as printed on the device: 1, 2, 3
+        [DataMember] public bool Paired;
+        [DataMember] public bool Unknown;    // the device can't tell us about this channel
+        [DataMember] public string Name = "";
     }
 
     [DataContract]

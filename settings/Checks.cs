@@ -51,6 +51,16 @@ namespace LiteOptions.SettingsApp
                 foreach (var tag in new[] { "keys", "settings", "mouse" }) { w.ShowPage(tag); await Task.Delay(400); }
                 log.Add("pages: mouse, keyboard, settings shown");
 
+                // the menu folds away on a narrow window and comes back on a wide one
+                var size = w.AppWindow.Size;
+                w.ResizeTo(760, 640); await Task.Delay(800);
+                bool folded = w.IsNarrow;
+                w.ResizeTo(1200, 760); await Task.Delay(800);
+                bool back = !w.IsNarrow;
+                w.AppWindow.Resize(size); await Task.Delay(500);
+                if (!folded || !back) { Finish(false, $"menu folding: folded when narrow={folded}, back when wide={back}"); return; }
+                log.Add("menu: folds behind the menu button when narrow, back on the left when wide");
+
                 string dir = string.IsNullOrEmpty(Entry.SelfTestFile) ? null : Path.GetDirectoryName(Path.GetFullPath(Entry.SelfTestFile));
                 if (dir != null) { await Task.Delay(1200); await Shots.CaptureAsync(w, dir, "selftest-window"); }
                 Finish(true, "the settings window works with this engine");
@@ -126,6 +136,16 @@ namespace LiteOptions.SettingsApp
             await snap("12-open-something"); await close();
             _ = Ui.Confirm("Uninstall LiteOptions?", "This removes LiteOptions, its settings and its startup entry.", "Uninstall", danger: true);
             await snap("13-confirm"); await close();
+
+            // a narrow window: the menu folds behind ☰ (and opens over the page when asked)
+            var size = w.AppWindow.Size;
+            w.ResizeTo(780, 700);
+            w.ShowPage("mouse");
+            await Task.Delay(600); await snap("17-narrow");
+            w.SetPaneOpen(true); await snap("18-narrow-menu");
+            w.SetPaneOpen(false);
+            w.AppWindow.Resize(size);
+            await Task.Delay(600);
 
             _ = SetupFlow.RunAsync(store);
             await snap("14-setup-1");

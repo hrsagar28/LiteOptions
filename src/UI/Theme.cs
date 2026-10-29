@@ -29,7 +29,8 @@ namespace LiteOptions.UI
             IcEdit = "", IcChevronDown = "", IcChevronRight = "", IcRight = "", IcLeft = "", IcUp = "",
             IcDown = "", IcRefresh = "", IcCopy = "", IcFolder = "", IcInfo = "", IcWarning = "",
             IcCheck = "", IcPower = "", IcPause = "", IcTouch = "", IcDiagnostic = "", IcApps = "",
-            IcBattery = "", IcSync = "", IcClose = "";
+            IcBattery = "", IcSync = "", IcClose = "",
+            IcMic = "\uE720", IcMicOff = "\uEC54", IcBrightness = "\uE706";
 
         static bool initialised;
 

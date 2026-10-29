@@ -72,16 +72,16 @@ namespace LiteOptions.SettingsApp
     sealed partial class MousePage : PageBase
     {
         readonly DeviceHero hero;
-        readonly SettingCard modeCard, actionCard, dpiCard, speedCard, precisionCard, linesCard, reverseCard;
+        readonly SettingCard modeCard, actionCard, dpiCard, speedCard, precisionCard, linesCard, reverseCard, smoothCard, hostsCard;
         readonly SettingCard[] gestureCards;
         readonly ComboBox mode;
         readonly ActionPicker middleAction, gClick, gUp, gDown, gLeft, gRight;
         readonly NoteCard appNote;
-        readonly TextBlock pointerHeader, scrollHeader;
+        readonly TextBlock pointerHeader, scrollHeader, hostsHeader;
         readonly Slider dpi, speed, lines;
         readonly TextBlock dpiValue, speedValue, linesValue;
         readonly Button dpiReset;
-        readonly ToggleSwitch precision, reverse;
+        readonly ToggleSwitch precision, reverse, smooth;
         readonly Debouncer dpiSend = new Debouncer(180), speedSend = new Debouncer(120), linesSend = new Debouncer(120);
         List<string> modes = new List<string>();
 
@@ -175,6 +175,14 @@ namespace LiteOptions.SettingsApp
             reverse = Ui.Toggle();
             reverse.Toggled += (s, e) => { if (!loading) ToggleReverse(); };
             reverseCard = Add(new SettingCard(Glyph.Swap, "Reverse scroll direction", "This mouse only. Windows asks for permission once; then switch the mouse off and on.", reverse));
+
+            smooth = Ui.Toggle();
+            smooth.Toggled += (s, e) => { if (!loading) { store.Settings.SmoothScroll = smooth.IsOn; store.Save(); } };
+            smoothCard = Add(new SettingCard(null, "Smooth scrolling",
+                "Each click of the wheel glides instead of jumping. Works in browsers, Office and most apps; if an older app stops scrolling, switch this off.", smooth));
+
+            hostsHeader = Section("Easy-Switch");
+            hostsCard = Add(EasySwitch.Card(mouse: true));
         }
 
         static TextBlock Value(double width) => new TextBlock { Width = width, VerticalAlignment = VerticalAlignment.Center, Style = Ui.Style("BodyStrongTextBlockStyle") };
@@ -203,7 +211,8 @@ namespace LiteOptions.SettingsApp
             gClick.Value = p.GestureClick; gUp.Value = p.GestureUp; gDown.Value = p.GestureDown; gLeft.Value = p.GestureLeft; gRight.Value = p.GestureRight;
             UpdateMiddle();
 
-            foreach (var e in new UIElement[] { pointerHeader, dpiCard, speedCard, precisionCard, scrollHeader, linesCard, reverseCard }) Show(e, global);
+            foreach (var e in new UIElement[] { pointerHeader, dpiCard, speedCard, precisionCard, scrollHeader, linesCard, reverseCard, smoothCard }) Show(e, global);
+            smooth.IsOn = store.Settings.SmoothScroll;
             appNote.Shown = !global;
             loading = false;
             LoadDevices();
@@ -225,6 +234,9 @@ namespace LiteOptions.SettingsApp
         {
             var m = store.Mouse;
             hero.Fill(m, "No mouse found", "Turn the mouse on, or pair it in Settings › Bluetooth & devices. Button remapping works either way.", store.IsLow(m));
+            EasySwitch.Fill(hostsCard, m);
+            if (!Current.IsGlobal) hostsCard.Shown = false;
+            Show(hostsHeader, hostsCard.Shown);
             loading = true;
             if (m != null && m.DpiMax > m.DpiMin)
             {
@@ -293,7 +305,8 @@ namespace LiteOptions.SettingsApp
     {
         readonly DeviceHero hero;
         readonly TextBlock fnHeader;
-        readonly SettingCard fnCard, remapCard;
+        readonly SettingCard fnCard, remapCard, hostsCard;
+        readonly TextBlock hostsHeader;
         readonly NoteCard fnNote, appNote;
         readonly ComboBox fn;
         readonly StackPanel list;
@@ -324,6 +337,9 @@ namespace LiteOptions.SettingsApp
             remapCard = Add(new SettingCard(Glyph.Edit, "Remapped keys", "", Ui.Button("Add key", Glyph.Add, accent: true, click: (s, e) => AddKey())));
             list = Add(new StackPanel { Spacing = 4 });
             Add(new NoteCard("Tip: to change a K380 media key, click Add key and press it exactly as you normally would."));
+
+            hostsHeader = Section("Easy-Switch");
+            hostsCard = Add(EasySwitch.Card(mouse: false));
         }
 
         public override void LoadSettings()
@@ -412,6 +428,9 @@ namespace LiteOptions.SettingsApp
         {
             var k = store.Keyboard;
             hero.Fill(k, "No keyboard found", "Turn the keyboard on, or pair it in Settings › Bluetooth & devices. Key remapping works either way.", store.IsLow(k));
+            EasySwitch.Fill(hostsCard, k);
+            if (!Current.IsGlobal) hostsCard.Shown = false;
+            Show(hostsHeader, hostsCard.Shown);
             string state = k == null ? "The keyboard isn't connected; your choice is applied when it connects."
                          : !k.FnSupported ? "This keyboard didn't offer the top-row setting."
                          : "Right now: " + (k.FnMedia == 1 ? "media keys first." : k.FnMedia == 0 ? "F1–F12 first." : "unknown.") + " Re-applied whenever the keyboard reconnects.";
@@ -430,7 +449,8 @@ namespace LiteOptions.SettingsApp
 
     sealed partial class SettingsPage : PageBase
     {
-        readonly ToggleSwitch startup, paused, notify, popups;
+        readonly ToggleSwitch startup, paused, notify, popups, lockPopups;
+        readonly SettingCard lockCard;
         readonly ComboBox lowBatt;
         readonly SettingCard optionsCard, aboutCard;
         readonly TextBox diag;
@@ -460,8 +480,11 @@ namespace LiteOptions.SettingsApp
             Add(new SettingCard(Glyph.Battery(30, false), "Low battery warning", "A notification when the mouse or keyboard battery runs low", Ui.Row(16, lowBatt, notify)));
 
             popups = Ui.Toggle();
-            popups.Toggled += (s, e) => { if (!loading) { store.Settings.ShowPopups = popups.IsOn; store.Save(); } };
-            Add(new SettingCard(Glyph.Message, "On-screen pop-ups", "A small note at the bottom of the screen when you switch the top row, change DPI or use a gesture", popups));
+            popups.Toggled += (s, e) => { if (!loading) { store.Settings.ShowPopups = popups.IsOn; store.Save(); } if (lockCard != null) lockCard.Shown = popups.IsOn; };
+            Add(new SettingCard(Glyph.Message, "On-screen pop-ups", "A small note at the bottom of the screen when you switch the top row, change DPI, mute the microphone or use a gesture", popups));
+            lockPopups = Ui.Toggle();
+            lockPopups.Toggled += (s, e) => { if (!loading) { store.Settings.LockKeyPopups = lockPopups.IsOn; store.Save(); } };
+            lockCard = Add(new SettingCard(null, "Caps Lock and Num Lock", "Show a pop-up when Caps Lock, Num Lock or Scroll Lock is switched on or off", lockPopups).Indent());
 
             Add(new SettingCard(Glyph.Setup, "Setup", "Go through the three first-run choices again",
                 Ui.Button("Run setup", null, false, async (s, e) => { if (RunSetup != null) await RunSetup(); })));
@@ -535,6 +558,8 @@ namespace LiteOptions.SettingsApp
             notify.IsOn = s.Notifications;
             lowBatt.IsEnabled = s.Notifications;
             popups.IsOn = s.ShowPopups;
+            lockPopups.IsOn = s.LockKeyPopups;
+            lockCard.Shown = s.ShowPopups;
             int near = levels.OrderBy(v => Math.Abs(v - s.LowBatteryPercent)).First();
             lowBatt.SelectedIndex = Array.IndexOf(levels, near);
             loading = false;

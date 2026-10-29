@@ -15,8 +15,8 @@ namespace LiteOptions.SettingsApp
     /// </summary>
     sealed partial class DeviceHero : CardBox
     {
-        // photo sizes (Assets/mouse.png is 447×790, Assets/keyboard.png 1300×580, backgrounds already cut away)
-        const double MouseH = 168, MouseW = MouseH * 447 / 790, KeysW = 330, KeysH = KeysW * 580 / 1300;
+        // photo sizes (Assets/mouse.png is 447×790, Assets/keyboard.png 1100×489, backgrounds already cut away)
+        const double MouseH = 168, MouseW = MouseH * 447 / 790, KeysW = 330, KeysH = KeysW * 489 / 1100;
 
         readonly bool mouse;
         readonly Grid art;
@@ -53,8 +53,8 @@ namespace LiteOptions.SettingsApp
             }
             else
             {
-                Hotspot(spots, 0.02, 0.2106, 0.9587, 0.7374, "remap", "Remap keys", 8);
-                Hotspot(spots, 0.02, 0.1056, 0.9587, 0.1001, "toprow", "Top row (media keys / F1–F12)", 8);
+                Hotspot(spots, 0.0227, 0.2042, 0.9526, 0.7417, "remap", "Remap keys", 8);
+                Hotspot(spots, 0.0227, 0.1021, 0.9526, 0.0976, "toprow", "Top row (media keys / F1–F12)", 8);
             }
             art.Children.Add(spots);
             g.Children.Add(art);
