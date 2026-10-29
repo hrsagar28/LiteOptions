@@ -179,6 +179,11 @@ namespace LiteOptions.SettingsApp
             await Task.Delay(600); await snap("17-narrow");
             w.SetPaneOpen(true); await snap("18-narrow-menu");
             w.SetPaneOpen(false);
+            // a big, wide window (like a maximised one on a large screen): the column stays lined up on the left
+            w.ResizeTo(1560, 900);
+            w.ShowPage("apps"); await Task.Delay(600); await snap("23-wide-apps");
+            w.ShowPage("alerts"); await snap("24-wide-alerts");
+            w.ShowPage("mouse"); await snap("25-wide-mouse");
             w.AppWindow.Resize(size);
             await Task.Delay(600);
 

@@ -40,6 +40,8 @@ namespace LiteOptions.SettingsApp
         bool revealed, narrow, paneModeSet;
         /// <summary>Window widths (in effective pixels) below this hide the menu behind ☰, as Windows Settings does.</summary>
         internal const double NarrowWidth = 1000;
+        /// <summary>The page column stops growing here; wider windows leave the space on the right, as Windows Settings does.</summary>
+        const double ContentMaxWidth = 1000;
         internal readonly MousePage MousePage;
         internal readonly KeyboardPage KeysPage;
         internal readonly AppsPage AppsPage;
@@ -141,6 +143,7 @@ namespace LiteOptions.SettingsApp
             var profileMenu = new MenuFlyout { Placement = FlyoutPlacementMode.BottomEdgeAlignedRight };
             profileMenu.Opening += (s, e) => BuildProfileMenu(profileMenu);
             profileButton.Flyout = profileMenu;
+            // like Windows Settings, the page is one column up to 1000 wide, lined up on the left under the title
             var header = new Grid { Margin = new Thickness(40, 24, 40, 6), ColumnSpacing = 16, MinHeight = 40 };
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -157,21 +160,30 @@ namespace LiteOptions.SettingsApp
             var start = Ui.Button("Start it", null, accent: true, click: (s, e) => StartEngine());
             engineBar.ActionButton = start;
 
-            pageHost = new Border { MaxWidth = 1000, Margin = new Thickness(40, 12, 40, 0) };
-            scroller = new ScrollViewer { Content = pageHost, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollMode = ScrollMode.Disabled };
+            pageHost = new Border { Margin = new Thickness(40, 12, 40, 0) };
+            // no sideways scrolling: pages are laid out at the window's width (text wraps) instead of their widest line
+            scroller = new ScrollViewer
+            {
+                Content = LeftColumn(pageHost),
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                HorizontalScrollMode = ScrollMode.Disabled,
+            };
 
             var content = new Grid();
             content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            Grid.SetRow(engineBar, 1);
+            var headerColumn = LeftColumn(header);
+            var engineColumn = LeftColumn(engineBar);
+            Grid.SetRow(engineColumn, 1);
             Grid.SetRow(scroller, 2);
             // Until the background app has answered, show a spinner rather than "No mouse found" and default values
             loadingRing = new ProgressRing { IsActive = true, Width = 36, Height = 36, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
             Grid.SetRow(loadingRing, 2);
             scroller.Opacity = 0;
-            content.Children.Add(header);
-            content.Children.Add(engineBar);
+            content.Children.Add(headerColumn);
+            content.Children.Add(engineColumn);
             content.Children.Add(scroller);
             content.Children.Add(loadingRing);
 
@@ -243,6 +255,18 @@ namespace LiteOptions.SettingsApp
             OnDevices();
             // only complain about the engine if it doesn't answer quickly
             _ = Task.Delay(1500).ContinueWith(_ => DispatcherQueue.TryEnqueue(UpdateEngineBar));
+        }
+
+        /// <summary>
+        /// Puts an element in a column that fills the width up to <see cref="ContentMaxWidth"/> (plus its side margins)
+        /// and then stays on the left, like Windows Settings. (A plain MaxWidth would centre it instead.)
+        /// </summary>
+        static Grid LeftColumn(FrameworkElement e)
+        {
+            var g = new Grid();
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MaxWidth = ContentMaxWidth + 80 });
+            g.Children.Add(e);
+            return g;
         }
 
         static NavigationViewItem Item(string text, string glyph, string tag) =>

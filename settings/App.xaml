@@ -9,6 +9,9 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
 
+            <!-- switches take only their own width (the default keeps 154 px, leaving a gap at the end of every row) -->
+            <x:Double x:Key="ToggleSwitchThemeMinWidth">0</x:Double>
+
             <!-- the pages are built in code; these styles keep them on the Windows 11 theme brushes (and follow light/dark live) -->
             <x:Double x:Key="ContentDialogMaxWidth">640</x:Double>
 
