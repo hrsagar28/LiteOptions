@@ -316,7 +316,7 @@ namespace LiteOptions.SettingsApp
         }
 
         /// <summary>A device in the menu: its photo in a battery ring, its name and state. Clicking it opens its page.</summary>
-        UIElement DeviceRow(DeviceDto d, bool mouse)
+        FrameworkElement DeviceRow(DeviceDto d, bool mouse)
         {
             var ring = Ring.Device(d, mouse, 44, store.IsLow(d));
             string name = d?.Name ?? (mouse ? "Mouse" : "Keyboard");

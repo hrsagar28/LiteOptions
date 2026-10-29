@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using LiteOptions.Input;
 using LiteOptions.Ipc;
 using Microsoft.UI;
 using Microsoft.UI.Composition.SystemBackdrops;
@@ -204,7 +205,7 @@ namespace LiteOptions.SettingsApp
         }
 
         /// <summary>A device: its photo in a battery ring, its name, and one line about it. Clicking it opens its page.</summary>
-        UIElement DeviceTile(DeviceDto d, bool mouse, string detail)
+        FrameworkElement DeviceTile(DeviceDto d, bool mouse, string detail)
         {
             var stack = new StackPanel { Spacing = 4, HorizontalAlignment = HorizontalAlignment.Center };
             var ring = Ring.Device(d, mouse, 64, store.IsLow(d));

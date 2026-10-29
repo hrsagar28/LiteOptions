@@ -51,7 +51,7 @@ namespace LiteOptions.SettingsApp
         }
 
         /// <summary>A section heading with something on its right: a short note or a button.</summary>
-        protected Grid Section(string text, UIElement right)
+        protected Grid Section(string text, FrameworkElement right)
         {
             var g = new Grid { ColumnSpacing = 12 };
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -151,7 +151,7 @@ namespace LiteOptions.SettingsApp
             var cross = new Grid { ColumnSpacing = 8, RowSpacing = 8, MaxWidth = 660, HorizontalAlignment = HorizontalAlignment.Left };
             for (int i = 0; i < 3; i++) cross.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             for (int i = 0; i < 3; i++) cross.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            void place(UIElement e, int row, int col) { Grid.SetRow(e, row); Grid.SetColumn(e, col); cross.Children.Add(e); }
+            void place(FrameworkElement e, int row, int col) { Grid.SetRow(e, row); Grid.SetColumn(e, col); cross.Children.Add(e); }
             place(gUp, 0, 1); place(gLeft, 1, 0); place(gClick, 1, 1); place(gRight, 1, 2); place(gDown, 2, 1);
             gestureBox = buttons.Add(new Border
             {
