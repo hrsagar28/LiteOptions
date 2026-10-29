@@ -72,6 +72,7 @@ namespace LiteOptions.SettingsApp
             {
                 case "Mouse": return Glyph.Mouse;
                 case "Windows": return "\uE782";
+                case "Screen": return "\uE706";
                 case "LiteOptions": return Glyph.Keyboard;
                 case "Editing": return Glyph.Edit;
                 case "Browser & tabs": return "\uE774";

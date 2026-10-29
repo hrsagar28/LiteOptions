@@ -171,15 +171,14 @@ namespace LiteOptions.SettingsApp
                 linesSend.Run(() => _ = store.Send("setWheelLines", v));
             };
             linesCard = Add(new SettingCard(Glyph.Scroll, "Scroll distance", "Lines moved by one click of the wheel. Windows' default is 3.", Ui.Row(10, lines, linesValue, Spacer())));
+            smooth = Ui.Toggle();
+            smooth.Toggled += (s, e) => { if (!loading) { store.Settings.SmoothScroll = smooth.IsOn; store.Save(); } };
+            smoothCard = Add(new SettingCard(null, "Smooth scrolling",
+                "Each click of the wheel glides instead of jumping. Works in browsers, Office and most apps; if an older app stops scrolling, switch this off.", smooth).Indent());
 
             reverse = Ui.Toggle();
             reverse.Toggled += (s, e) => { if (!loading) ToggleReverse(); };
             reverseCard = Add(new SettingCard(Glyph.Swap, "Reverse scroll direction", "This mouse only. Windows asks for permission once; then switch the mouse off and on.", reverse));
-
-            smooth = Ui.Toggle();
-            smooth.Toggled += (s, e) => { if (!loading) { store.Settings.SmoothScroll = smooth.IsOn; store.Save(); } };
-            smoothCard = Add(new SettingCard(null, "Smooth scrolling",
-                "Each click of the wheel glides instead of jumping. Works in browsers, Office and most apps; if an older app stops scrolling, switch this off.", smooth));
 
             hostsHeader = Section("Easy-Switch");
             hostsCard = Add(EasySwitch.Card(mouse: true));

@@ -12,7 +12,7 @@ namespace LiteOptions.SettingsApp
     /// </summary>
     static class EasySwitch
     {
-        public static SettingCard Card(bool mouse) => new SettingCard("", "Easy-Switch",
+        public static SettingCard Card(bool mouse) => new SettingCard("", "Paired computers and phones",
             mouse ? "The Easy-Switch button underneath moves the mouse between the computers and phones paired with it."
                   : "The keyboard's Easy-Switch keys (F1, F2 and F3 on the K380) move it between the computers and phones paired with it.",
             new StackPanel { Spacing = 6 }, stackControl: true);
