@@ -30,6 +30,8 @@ namespace LiteOptions.SettingsApp
         readonly Border pageHost;
         readonly InfoBar engineBar;
         readonly StackPanel deviceStatus;
+        readonly ProgressRing loadingRing;
+        bool revealed;
         internal readonly MousePage MousePage;
         internal readonly KeyboardPage KeysPage;
         internal readonly SettingsPage SettingsPage;
@@ -95,15 +97,20 @@ namespace LiteOptions.SettingsApp
             content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             Grid.SetRow(engineBar, 1);
             Grid.SetRow(scroller, 2);
+            // Until the background app has answered, show a spinner rather than "No mouse found" and default values
+            loadingRing = new ProgressRing { IsActive = true, Width = 36, Height = 36, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetRow(loadingRing, 2);
+            scroller.Opacity = 0;
             content.Children.Add(header);
             content.Children.Add(engineBar);
             content.Children.Add(scroller);
+            content.Children.Add(loadingRing);
 
             // ── navigation ──
             navMouse = new NavigationViewItem { Content = "Mouse", Icon = new FontIcon { Glyph = Glyph.Mouse }, Tag = "mouse" };
             navKeys = new NavigationViewItem { Content = "Keyboard", Icon = new FontIcon { Glyph = Glyph.Keyboard }, Tag = "keys" };
             navSettings = new NavigationViewItem { Content = "Settings", Icon = new FontIcon { Glyph = Glyph.Settings }, Tag = "settings" };
-            deviceStatus = new StackPanel { Spacing = 6, Margin = new Thickness(16, 8, 16, 16) };
+            deviceStatus = new StackPanel { Spacing = 6, Margin = new Thickness(16, 8, 16, 16), Opacity = 0 };
             nav = new NavigationView
             {
                 PaneDisplayMode = NavigationViewPaneDisplayMode.Left,
@@ -179,9 +186,21 @@ namespace LiteOptions.SettingsApp
             SettingsPage.LoadSettings();
         }
 
+        /// <summary>Show the pages once real data has arrived (or once it's clear the background app isn't running).</summary>
+        void Reveal()
+        {
+            if (revealed) return;
+            revealed = true;
+            loadingRing.IsActive = false;
+            loadingRing.Visibility = Visibility.Collapsed;
+            scroller.Opacity = 1;
+            deviceStatus.Opacity = 1;
+        }
+
         void OnSettings()
         {
             ReloadPages();
+            if (store.Loaded) Reveal();
             if (store.Loaded && !store.Settings.SetupDone && !setupStarted && !Entry.SelfTest && Entry.ShotsDir == null)
             {
                 setupStarted = true;
@@ -191,6 +210,7 @@ namespace LiteOptions.SettingsApp
 
         void OnDevices()
         {
+            if (store.Loaded) Reveal();
             MousePage.LoadDevices();
             KeysPage.LoadDevices();
             deviceStatus.Children.Clear();
@@ -286,6 +306,7 @@ namespace LiteOptions.SettingsApp
         void UpdateEngineBar()
         {
             bool down = !store.Connected;
+            if (down || store.Loaded) Reveal();
             engineBar.IsOpen = down;
             scroller.IsEnabled = !down;
             profileButton.IsEnabled = !down;

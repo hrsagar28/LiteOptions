@@ -58,6 +58,7 @@ namespace LiteOptions.SettingsApp
 
         void Apply(IpcMessage r)
         {
+            Loaded = true; // set first, so the window can show its pages as soon as the first answer is handled
             if (r.Settings != null && !saveTimer.IsRunning)
             {
                 r.Settings.Normalize();
@@ -67,7 +68,6 @@ namespace LiteOptions.SettingsApp
             }
             if (r.Devices != null) { Devices = r.Devices; DevicesChanged?.Invoke(); }
             if (r.System != null) { System = r.System; SystemChanged?.Invoke(); }
-            Loaded = true;
         }
 
         void OnPushed(IpcMessage m)
