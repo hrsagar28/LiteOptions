@@ -213,4 +213,8 @@ jobs:
 
             Double-click it to install or update (your settings are kept). Windows may say "Windows protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
 
-            New in 2.0: a Windows 11-style settings window (WinUI 3) that only runs while it's open, and a native ARM64 background app.
+            Fixed in 2.0.1:
+            - The K380's top row is set again a few seconds after the keyboard wakes up. Before, it could stay on media keys until the next 5-minute check.
+            - Ctrl + Esc fixes a keyboard that's out of step with your setting in one press.
+            - Battery levels are shown as a small drawn battery (green, amber when low, red when very low).
+            - The settings window shows a spinner instead of "No mouse found" while it starts, keeps the device name readable in a narrow window, and the DPI slider works with the arrow keys.

@@ -233,9 +233,7 @@ namespace LiteOptions.SettingsApp
             if (d != null && d.Online && d.HasBattery)
             {
                 int pct = d.BatteryPercent >= 0 ? d.BatteryPercent : DeviceHero.LevelPercent(d.BatteryLevel);
-                var b = Ui.Icon(Glyph.Battery(pct, d.Charging), 14);
-                b.Foreground = store.IsLow(d) ? Ui.Brush("SystemFillColorCriticalBrush") : Ui.Brush("TextFillColorSecondaryBrush");
-                right.Children.Add(b);
+                right.Children.Add(Ui.BatteryShape(pct, d.Charging, store.IsLow(d), 9));
             }
             right.Children.Add(Ui.Text(state, "Secondary", wrap: false));
             Grid.SetColumn(name, 1);

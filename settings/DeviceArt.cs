@@ -21,7 +21,7 @@ namespace LiteOptions.SettingsApp
         readonly bool mouse;
         readonly Grid art;
         readonly TextBlock name, status, battery, firmware, hint;
-        readonly FontIcon batteryIcon;
+        readonly Border batteryIcon;
         readonly Ellipse dot;
         readonly StackPanel batteryRow, info;
         readonly Grid layout;
@@ -62,7 +62,7 @@ namespace LiteOptions.SettingsApp
             name = new TextBlock { Style = Ui.Style("SubtitleTextBlockStyle"), TextWrapping = TextWrapping.Wrap };
             dot = new Ellipse { Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center };
             status = new TextBlock { Style = Ui.Style("SecondaryBody"), VerticalAlignment = VerticalAlignment.Center };
-            batteryIcon = new FontIcon { FontSize = 16, VerticalAlignment = VerticalAlignment.Center };
+            batteryIcon = new Border { VerticalAlignment = VerticalAlignment.Center };
             battery = new TextBlock { Style = Ui.Style("BodyTextBlockStyle"), VerticalAlignment = VerticalAlignment.Center };
             batteryRow = Ui.Row(8, batteryIcon, battery);
             firmware = new TextBlock { Style = Ui.Style("Secondary") };
@@ -104,8 +104,7 @@ namespace LiteOptions.SettingsApp
             if (d.HasBattery)
             {
                 int pct = d.BatteryPercent >= 0 ? d.BatteryPercent : LevelPercent(d.BatteryLevel);
-                batteryIcon.Glyph = Glyph.Battery(pct, d.Charging);
-                batteryIcon.Foreground = low ? Ui.Brush("SystemFillColorCriticalBrush") : Ui.Brush("TextFillColorPrimaryBrush");
+                batteryIcon.Child = Ui.BatteryShape(pct, d.Charging, low, 12);
                 battery.Text = (d.BatteryPercent >= 0 ? d.BatteryPercent + "%" : d.BatteryLevel + " battery") + (d.Charging ? ", charging" : low ? " — replace soon" : "");
             }
             firmware.Visibility = string.IsNullOrEmpty(d.Firmware) ? Visibility.Collapsed : Visibility.Visible;

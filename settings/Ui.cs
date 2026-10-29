@@ -33,6 +33,46 @@ namespace LiteOptions.SettingsApp
 
         public static FontIcon Icon(string glyph, double size = 16) => new FontIcon { Glyph = glyph, FontSize = size };
 
+        /// <summary>
+        /// A small drawn battery (outline, coloured fill, nub) — the font's battery glyphs look odd at small sizes.
+        /// Green when fine, amber at 30% or less, red when low; accent colour while charging.
+        /// </summary>
+        public static FrameworkElement BatteryShape(int percent, bool charging, bool low, double height = 10)
+        {
+            int p = Math.Max(0, Math.Min(100, percent));
+            double w = Math.Round(height * 2.1), pad = 1.5;
+            string fillKey = charging ? "AccentFillColorDefaultBrush" : low ? "SystemFillColorCriticalBrush" : p <= 30 ? "SystemFillColorCautionBrush" : "SystemFillColorSuccessBrush";
+            var outline = new Border
+            {
+                Width = w, Height = height,
+                CornerRadius = new CornerRadius(height * 0.28),
+                BorderThickness = new Thickness(1),
+                BorderBrush = Brush("TextFillColorSecondaryBrush"),
+                Padding = new Thickness(pad),
+            };
+            double inner = w - 2 - 2 * pad;
+            outline.Child = new Border
+            {
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Width = p == 0 ? 0 : Math.Max(1.5, inner * p / 100.0),
+                CornerRadius = new CornerRadius(height * 0.12),
+                Background = Brush(fillKey),
+            };
+            var nub = new Border
+            {
+                Width = Math.Max(1.5, height * 0.16), Height = height * 0.45,
+                Margin = new Thickness(1, 0, 0, 0),
+                CornerRadius = new CornerRadius(0, 1, 1, 0),
+                Background = Brush("TextFillColorSecondaryBrush"),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            row.Children.Add(outline);
+            row.Children.Add(nub);
+            ToolTipService.SetToolTip(row, p + "%" + (charging ? ", charging" : ""));
+            return row;
+        }
+
         public static TextBlock Text(string text, string style = "BodyTextBlockStyle", bool wrap = true)
         {
             var t = new TextBlock { Text = text ?? "", Style = Style(style) };
