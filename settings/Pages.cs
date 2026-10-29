@@ -197,7 +197,8 @@ namespace LiteOptions.SettingsApp
                 int v = (int)speed.Value;
                 speedSend.Run(() => _ = store.Send("setPointerSpeed", v));
             };
-            speedCard = Find(pointerGroup.Add(new SettingCard(Glyph.Touch, "Windows pointer speed", "Also changes the touchpad. Windows' default is 10.", Ui.Row(10, speed, speedValue, Spacer()))), "pointer speed cursor touchpad");
+            speedCard = Find(pointerGroup.Add(new SettingCard(Glyph.Touch, "Windows pointer speed", "Also changes the touchpad. Windows' default is 10.", Ui.Row(10, speed, speedValue,
+                Ui.IconButton(Glyph.Refresh, "Back to Windows' default (10)", (s, e) => speed.Value = 10)))), "pointer speed cursor touchpad");
 
             precision = Ui.Toggle();
             precision.Toggled += (s, e) => { if (!loading) _ = store.Send("setPrecision", on: precision.IsOn); };
@@ -215,7 +216,8 @@ namespace LiteOptions.SettingsApp
                 if (loading) return;
                 linesSend.Run(() => _ = store.Send("setWheelLines", v));
             };
-            linesCard = Find(scrollGroup.Add(new SettingCard(Glyph.Scroll, "Scroll distance", "Lines moved by one click of the wheel. Windows' default is 3.", Ui.Row(10, lines, linesValue, Spacer()))), "scroll distance lines wheel");
+            linesCard = Find(scrollGroup.Add(new SettingCard(Glyph.Scroll, "Scroll distance", "Lines moved by one click of the wheel. Windows' default is 3.", Ui.Row(10, lines, linesValue,
+                Ui.IconButton(Glyph.Refresh, "Back to Windows' default (3 lines)", (s, e) => lines.Value = 3)))), "scroll distance lines wheel");
 
             smooth = Ui.Toggle();
             smooth.Toggled += (s, e) => { UpdateScrollCallout(); if (!loading) { store.Settings.SmoothScroll = smooth.IsOn; store.Save(); } };
@@ -232,7 +234,6 @@ namespace LiteOptions.SettingsApp
         }
 
         static TextBlock Value(double width) => new TextBlock { Width = width, VerticalAlignment = VerticalAlignment.Center, Style = Ui.Style("BodyStrongTextBlockStyle") };
-        static FrameworkElement Spacer() => new Border { Width = 36 };
 
         ActionPicker Picker(string defaultLabel, Action<ActionSpec> set, bool allowNothing = true)
         {
