@@ -23,7 +23,9 @@ namespace LiteOptions.SettingsApp
         readonly TextBlock name, status, battery, firmware, hint;
         readonly FontIcon batteryIcon;
         readonly Ellipse dot;
-        readonly StackPanel batteryRow;
+        readonly StackPanel batteryRow, info;
+        readonly Grid layout;
+        readonly double artW;
         public event Action<string> HotspotClicked;
 
         public DeviceHero(bool mouse)
@@ -31,11 +33,14 @@ namespace LiteOptions.SettingsApp
             this.mouse = mouse;
             Box.Padding = new Thickness(24, 18, 24, 18);
 
-            var g = new Grid { ColumnSpacing = 32 };
+            var g = layout = new Grid { ColumnSpacing = 32 };
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             double w = mouse ? MouseW : KeysW, h = mouse ? MouseH : KeysH;
+            artW = w + (mouse ? 48 : 0);
             art = new Grid { Width = w, Height = h, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(mouse ? 24 : 0, 0, mouse ? 24 : 0, 0) };
             var photo = new Image { Stretch = Stretch.Fill, Width = w, Height = h };
             try { photo.Source = new BitmapImage(new Uri(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", mouse ? "mouse.png" : "keyboard.png"))); } catch { }
@@ -62,11 +67,22 @@ namespace LiteOptions.SettingsApp
             batteryRow = Ui.Row(8, batteryIcon, battery);
             firmware = new TextBlock { Style = Ui.Style("Secondary") };
             hint = new TextBlock { Style = Ui.Style("Secondary"), Margin = new Thickness(0, 6, 0, 0) };
-            var info = Ui.Column(6, name, Ui.Row(8, dot, status), batteryRow, firmware, hint);
+            info = Ui.Column(6, name, Ui.Row(8, dot, status), batteryRow, firmware, hint);
             info.VerticalAlignment = VerticalAlignment.Center;
             Grid.SetColumn(info, 1);
             g.Children.Add(info);
             Box.Child = g;
+            SizeChanged += (s, e) => Reflow(e.NewSize.Width);
+        }
+
+        /// <summary>In a narrow window the photo and the text don't fit side by side: put the text under the photo.</summary>
+        void Reflow(double width)
+        {
+            bool stack = width < artW + 32 + 48 + 260; // photo + gap + card padding + room for the name
+            Grid.SetRow(info, stack ? 1 : 0);
+            Grid.SetColumn(info, stack ? 0 : 1);
+            Grid.SetColumnSpan(info, stack ? 2 : 1);
+            layout.RowSpacing = stack ? 14 : 0;
         }
 
         public void Fill(DeviceDto d, string missing, string missingHint, bool low)

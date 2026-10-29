@@ -128,13 +128,17 @@ namespace LiteOptions.UI
 
         public void ToggleFn()
         {
-            Settings.FnMode = Settings.FnMode == "standard" ? "media" : "standard";
-            bool media = Settings.FnMode == "media";
+            // Flip what the keyboard is actually doing. If a reconnect left it out of step with the saved mode,
+            // one press fixes it (flipping the saved mode instead would need two presses).
+            var k = Devices.Keyboard;
+            bool nowMedia = k != null && k.Online && k.FnSupported && k.FnMedia.HasValue ? k.FnMedia.Value : Settings.FnMode == "media";
+            bool media = !nowMedia;
+            Settings.FnMode = media ? "media" : "standard";
+            if (k != null && k.FnSupported) k.FnMedia = media; // so a quick second press flips back; the device's answer overwrites this
             Commit();
             Devices.SetFnMode(media);
             form?.RefreshDevices();
             BroadcastSettings();
-            var k = Devices.Keyboard;
             string sub = k == null ? "Keyboard not connected; applied when it connects"
                        : !k.FnSupported ? "This keyboard doesn't support switching"
                        : media ? "Hold Fn for F1–F12" : "Hold Fn for media keys";
@@ -352,6 +356,7 @@ namespace LiteOptions.UI
         {
             readonly TrayApp app;
             readonly IntPtr notify;
+            DateTime lastResume = DateTime.MinValue;
 
             public MessageWindow(TrayApp app)
             {
@@ -380,7 +385,9 @@ namespace LiteOptions.UI
                     int ev = (int)m.WParam;
                     if (ev == Native.PBT_APMRESUMEAUTOMATIC || ev == Native.PBT_APMRESUMESUSPEND)
                     {
-                        Logger.Write("Resumed from sleep");
+                        // Windows sends both events for one wake-up; log it once
+                        if ((DateTime.UtcNow - lastResume).TotalSeconds > 10) Logger.Write("Resumed from sleep");
+                        lastResume = DateTime.UtcNow;
                         app.Hooks?.Rehook();
                         app.Devices.RequestScan(5000);
                     }

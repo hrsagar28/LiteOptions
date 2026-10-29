@@ -394,7 +394,7 @@ namespace LiteOptions.SettingsApp
             });
 
             string chosen = null;
-            var list = new ListView { SelectionMode = ListViewSelectionMode.Single, Height = 300 };
+            var list = new ListView { SelectionMode = ListViewSelectionMode.Single, MaxHeight = 300 };
             foreach (var a in apps)
             {
                 var img = new Image { Width = 24, Height = 24, VerticalAlignment = VerticalAlignment.Center };

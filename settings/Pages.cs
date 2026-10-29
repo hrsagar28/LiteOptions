@@ -232,6 +232,8 @@ namespace LiteOptions.SettingsApp
                 dpi.Minimum = m.DpiMin;
                 dpi.Maximum = m.DpiMax;
                 dpi.StepFrequency = step;
+                dpi.SmallChange = step;      // arrow keys: one step (the default of 1 snaps straight back)
+                dpi.LargeChange = step * 5;  // Page Up / Page Down
                 dpi.IsEnabled = dpiReset.IsEnabled = m.Online;
                 int want = store.Settings.MouseDpi > 0 ? store.Settings.MouseDpi : m.DpiCurrent;
                 want = Math.Max(m.DpiMin, Math.Min(m.DpiMax, m.DpiMin + (int)Math.Round((want - m.DpiMin) / (double)step) * step));

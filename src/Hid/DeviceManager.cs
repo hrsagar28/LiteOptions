@@ -22,6 +22,9 @@ namespace LiteOptions.Hid
         public volatile bool Online = true;
         public int Failures;
         public string LastError;
+        internal int ApplyRetries;
+        public int ApplyRetriesForTests => ApplyRetries;
+        internal System.Threading.Timer RetryTimer;
         public string StatusText => !Online ? "Not responding (asleep or off)" : Connection + (Battery != null ? " · Battery " + Battery.Text : "");
     }
 
@@ -77,6 +80,8 @@ namespace LiteOptions.Hid
 
         public event Action Changed;
         public TimeSpan PollInterval = TimeSpan.FromMinutes(5);
+        /// <summary>A device that has just woken up often ignores the first request. Retry applying settings after these delays.</summary>
+        public int[] ApplyRetryDelaysMs = { 2000, 5000, 12000 };
         public List<string> LastEnumeration { get; private set; } = new List<string>();
 
         public DeviceManager(IDeviceSource source, Func<AppSettings> getSettings)
@@ -129,7 +134,7 @@ namespace LiteOptions.Hid
 
         public void RequestPoll() => Post(Poll);
         public void RequestReviveForTests() => Post(Revive);
-        public void ApplySettingsNow() => Post(() => { foreach (var d in Snapshot()) SafeApply(d); RaiseChanged(); });
+        public void ApplySettingsNow() => Post(() => { foreach (var d in Snapshot()) ApplyFresh(d); RaiseChanged(); });
 
         /// <summary>Live DPI change (slider drag). Coalesces to the latest value.</summary>
         public void SetDpi(int dpi)
@@ -251,7 +256,7 @@ namespace LiteOptions.Hid
                 };
                 Identify(d, g);
                 lock (stateLock) g.Devices.Add(d);
-                SafeApply(d);
+                ApplyFresh(d);
                 RaiseChanged();
             }
         }
@@ -291,10 +296,39 @@ namespace LiteOptions.Hid
                          $"{(d.FnSupported ? $" Fn-swap 0x{dev.FnFeatureId:X4} media-first={d.FnMedia}" : "")}");
         }
 
+        /// <summary>Apply settings after a (re)connect or a settings change, with a few quick retries if the device isn't ready yet.</summary>
+        void ApplyFresh(LogiDevice d)
+        {
+            d.ApplyRetries = 0;
+            SafeApply(d);
+        }
+
         void SafeApply(LogiDevice d)
         {
-            try { Apply(d); d.Online = true; d.Failures = 0; }
-            catch (HidppException ex) { d.LastError = ex.Message; Logger.Write($"{d.Name}: could not apply settings: {ex.Message}"); }
+            try
+            {
+                Apply(d);
+                d.Online = true; d.Failures = 0; d.ApplyRetries = 0;
+                d.RetryTimer?.Dispose(); d.RetryTimer = null;
+            }
+            catch (HidppException ex)
+            {
+                d.LastError = ex.Message;
+                var delays = ApplyRetryDelaysMs ?? new int[0];
+                if (d.ApplyRetries < delays.Length && !disposed)
+                {
+                    int delay = delays[d.ApplyRetries++];
+                    Logger.Write($"{d.Name}: could not apply settings ({ex.Message}); trying again in {Math.Max(1, delay / 1000)} s");
+                    d.RetryTimer?.Dispose();
+                    d.RetryTimer = new Timer(_ => Post(() =>
+                    {
+                        if (!Snapshot().Contains(d)) return; // gone or replaced by a rescan
+                        SafeApply(d);
+                        RaiseChanged();
+                    }), null, delay, Timeout.Infinite);
+                }
+                else Logger.Write($"{d.Name}: could not apply settings: {ex.Message}");
+            }
         }
 
         void Apply(LogiDevice d)
@@ -385,7 +419,7 @@ namespace LiteOptions.Hid
                         if (!d.Dev.Ping(800)) continue;
                         d.Online = true; d.Failures = 0;
                         Logger.Write($"{d.Name} is back; re-applying settings");
-                        SafeApply(d);
+                        ApplyFresh(d);
                         try { d.Battery = d.Dev.ReadBattery() ?? d.Battery; } catch (HidppException) { }
                         changed = true;
                     }
@@ -408,7 +442,7 @@ namespace LiteOptions.Hid
                         Thread.Sleep(300);
                         var d = Find(g, x => x.Dev.Index == idx);
                         if (d == null) ProbeGroup(g);
-                        else { d.Online = true; SafeApply(d); try { d.Battery = d.Dev.ReadBattery() ?? d.Battery; } catch (HidppException) { } }
+                        else { d.Online = true; ApplyFresh(d); try { d.Battery = d.Dev.ReadBattery() ?? d.Battery; } catch (HidppException) { } }
                         RaiseChanged();
                     });
                 else
@@ -430,7 +464,7 @@ namespace LiteOptions.Hid
                     Thread.Sleep(300);
                     dev.Online = true;
                     Logger.Write($"{dev.Name} reconnected; re-applying settings");
-                    SafeApply(dev);
+                    ApplyFresh(dev);
                     try { dev.Battery = dev.Dev.ReadBattery() ?? dev.Battery; } catch (HidppException) { }
                     RaiseChanged();
                 });
@@ -450,6 +484,7 @@ namespace LiteOptions.Hid
             pollTimer?.Dispose();
             reviveTimer?.Dispose();
             scanDebounce?.Dispose();
+            foreach (var d in Snapshot()) { d.RetryTimer?.Dispose(); d.RetryTimer = null; }
             work.CompleteAdding();
             worker?.Join(1500);
             lock (stateLock)

@@ -187,6 +187,24 @@ namespace LiteOptions.Tests
             Check(src.Opens == 2, "no reopen churn for healthy devices");
             dm.Dispose();
 
+            Section("Keyboard reconnects but ignores the first write; a quick retry fixes it");
+            var kb3 = FakeDevice.K380(); kb3.FnInv = true; kb3.DropFnWrites = 1;
+            var src3 = new FakeSource(); var l3 = new FakeLink(true, true); l3.Slots[0xFF] = kb3;
+            src3.Add(@"BTHENUM\{00001124}_VID&0002046D_PID&B342#3", 0xB342, l3, "Keyboard K380");
+            var s3 = NewSettings(); s3.FnMode = "standard";
+            var dm3 = new DeviceManager(src3, () => s3) { ApplyRetryDelaysMs = new[] { 50, 50, 50 } };
+            dm3.StartForTests(); dm3.RunPendingForTests();
+            Check(kb3.FnInv == true && dm3.Keyboard != null, "first write unanswered: keyboard still on media keys");
+            Thread.Sleep(400);
+            dm3.RunPendingForTests();
+            Check(kb3.FnInv == false, "retry a couple of seconds later sets F1–F12 (no 5-minute wait)");
+            foreach (var d in dm3.Snapshot()) d.Dev.Timeout = 200;
+            kb3.DropFnWrites = 10; kb3.FnInv = true;
+            dm3.ApplySettingsNow(); dm3.RunPendingForTests();
+            for (int i = 0; i < 4; i++) { Thread.Sleep(150); dm3.RunPendingForTests(); }
+            Check(kb3.FnInv == true && dm3.Keyboard.ApplyRetriesForTests == 3, "gives up after 3 retries instead of looping");
+            dm3.Dispose();
+
             Section("Settings 'unchanged' leaves devices alone");
             var mouse2 = FakeDevice.PebbleM350s(); mouse2.Dpi = 800;
             var src2 = new FakeSource(); var l2 = new FakeLink(true, false); l2.Slots[0xFF] = mouse2;

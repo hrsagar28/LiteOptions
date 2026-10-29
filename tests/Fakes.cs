@@ -20,6 +20,7 @@ namespace LiteOptions.Tests
         public byte UnifiedLevel = 0x04;
         public bool Asleep;
         public int Requests;
+        public int DropFnWrites; // ignore this many "set Fn mode" requests, like a keyboard that has only just woken up
 
         public static FakeDevice PebbleM350s()
         {
@@ -129,6 +130,11 @@ namespace LiteOptions.Tests
                 return true;
             }
             if (d.Asleep) return true; // no answer
+            if (d.DropFnWrites > 0 && d.Features.TryGetValue(Feature.FnInversion, out var fnIdx) && feat == fnIdx && (fnsw >> 4) == 1)
+            {
+                d.DropFnWrites--;
+                return true; // no answer
+            }
             var resp = d.Handle(feat, fnsw >> 4, p, out int err);
             byte outDev = dev == 0xFF && AnswerDirectAsZero ? (byte)0 : dev;
             if (NotifyBeforeReply) Send(new byte[] { 0x11, outDev, 0x05, 0x00, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
