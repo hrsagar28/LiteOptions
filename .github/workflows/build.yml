@@ -223,7 +223,7 @@ jobs:
             Double-click it to install or update (your settings are kept). Windows may say "Windows protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
 
             Fixed in 2.2.2:
-            - On big or maximised windows the settings fill the window again, without running off the right edge.
+            - On big or maximised windows the settings sit in a column in the middle of the page, with equal space on both sides, and no longer run off the right edge.
             - Pointer speed and scroll distance have their own reset buttons, so every row ends at the edge.
 
             Fixed in 2.2.1:

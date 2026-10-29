@@ -40,6 +40,11 @@ namespace LiteOptions.SettingsApp
         bool revealed, narrow, paneModeSet;
         /// <summary>Window widths (in effective pixels) below this hide the menu behind ☰, as Windows Settings does.</summary>
         internal const double NarrowWidth = 1000;
+        /// <summary>
+        /// The page column stops growing here and sits in the middle of the area beside the menu, with equal space
+        /// either side (as in Windows Settings). The title and the "All apps" button line up with its edges.
+        /// </summary>
+        const double ContentMaxWidth = 1000;
         internal readonly MousePage MousePage;
         internal readonly KeyboardPage KeysPage;
         internal readonly AppsPage AppsPage;
@@ -141,7 +146,7 @@ namespace LiteOptions.SettingsApp
             var profileMenu = new MenuFlyout { Placement = FlyoutPlacementMode.BottomEdgeAlignedRight };
             profileMenu.Opening += (s, e) => BuildProfileMenu(profileMenu);
             profileButton.Flyout = profileMenu;
-            var header = new Grid { Margin = new Thickness(40, 24, 40, 6), ColumnSpacing = 16, MinHeight = 40 };
+            var header = new Grid { Margin = new Thickness(40, 24, 40, 6), ColumnSpacing = 16, MinHeight = 40, MaxWidth = ContentMaxWidth };
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             Grid.SetColumn(profileButton, 1);
@@ -150,15 +155,16 @@ namespace LiteOptions.SettingsApp
 
             engineBar = new InfoBar
             {
-                Severity = InfoBarSeverity.Warning, IsClosable = false, IsOpen = false, Margin = new Thickness(40, 4, 40, 4),
+                Severity = InfoBarSeverity.Warning, IsClosable = false, IsOpen = false, Margin = new Thickness(40, 4, 40, 4), MaxWidth = ContentMaxWidth,
                 Title = "LiteOptions isn't running in the background",
                 Message = "Your mouse and keyboard aren't being customised, and changes can't be made until it's running."
             };
             var start = Ui.Button("Start it", null, accent: true, click: (s, e) => StartEngine());
             engineBar.ActionButton = start;
 
-            pageHost = new Border { Margin = new Thickness(40, 12, 40, 0) };
-            // no sideways scrolling: pages are laid out at the window's width (text wraps) instead of their widest line
+            pageHost = new Border { Margin = new Thickness(40, 12, 40, 0), MaxWidth = ContentMaxWidth };
+            // no sideways scrolling: pages are laid out at the window's width (text wraps) instead of their widest line,
+            // so the capped column centres correctly instead of being pushed off to the right
             scroller = new ScrollViewer
             {
                 Content = pageHost,
