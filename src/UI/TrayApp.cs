@@ -55,9 +55,15 @@ namespace LiteOptions.UI
             {
                 Hooks = new InputHooks();
                 Hooks.Update(Settings);
-                Hooks.Gesture += (dir, a) => ui.Post(_ => Osd.Show(
-                    dir == "up" ? Theme.IcUp : dir == "down" ? Theme.IcDown : dir == "left" ? Theme.IcLeft : Theme.IcRight,
-                    Presets.Describe(a)), null);
+                Hooks.Gesture += (dir, a) =>
+                {
+                    string glyph = dir == "up" ? Theme.IcUp : dir == "down" ? Theme.IcDown : dir == "left" ? Theme.IcLeft : Theme.IcRight;
+                    string text = Presets.Describe(a);
+                    // after a virtual-desktop switch, wait for it to finish so the pop-up opens on the new desktop
+                    bool switches = a != null && a.Kind == "preset" && (a.Preset == "desktop_left" || a.Preset == "desktop_right");
+                    if (switches) System.Threading.Tasks.Task.Delay(350).ContinueWith(_ => ui.Post(__ => Osd.Show(glyph, text), null));
+                    else ui.Post(_ => Osd.Show(glyph, text), null);
+                };
                 ActionRunner.AppCommand = cmd => ui.Post(_ => AppCommand(cmd), null);
                 ActionRunner.Start();
                 Hooks.Start();
