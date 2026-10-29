@@ -36,7 +36,7 @@ namespace LiteOptions.SettingsApp
         readonly Debouncer dpiSend = new Debouncer(180);
         readonly IntPtr hwnd;
         W32.POINT anchor;
-        bool loading;
+        bool loading, shownOnce;
 
         public bool Showing { get; private set; }
         public DateTime HiddenAt { get; private set; } = DateTime.MinValue;
@@ -312,6 +312,11 @@ namespace LiteOptions.SettingsApp
             AppWindow.Show();
             Activate();
             W32.SetForegroundWindow(hwnd);
+            if (!shownOnce)
+            {
+                shownOnce = true;
+                try { Logger.Write($"Tray panel shown {(DateTime.Now - System.Diagnostics.Process.GetCurrentProcess().StartTime).TotalMilliseconds:0} ms after start"); } catch { }
+            }
             fnTile.Focus(FocusState.Programmatic);
             // once laid out at the real scale, fit the height exactly
             DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => Fit(false));

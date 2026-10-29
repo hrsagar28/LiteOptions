@@ -149,6 +149,13 @@ jobs:
           if ($w) { $w.CloseMainWindow() | Out-Null; Start-Sleep 3 }
           Say "after closing the window: window $(Mem (Get-Process LiteOptions.Settings -ErrorAction SilentlyContinue)); engine $(Mem (Get-Process LiteOptions -ErrorAction SilentlyContinue))"
 
+          # the tray panel, as a click on the tray icon opens it (its log line says how long it took to appear)
+          $p = Start-Process $ui -ArgumentList '--tray' -PassThru
+          Start-Sleep 5
+          Say "tray panel process: $(if ($p.HasExited) { 'exited ' + $p.ExitCode } else { 'running' })"
+          if (!$p.HasExited) { $p.Kill() }
+          Start-Sleep 1
+
           # 3. pictures of every page and dialog, with pretend devices
           $p = Start-Process $ui -ArgumentList '--shots', (Join-Path $r 'shots') -PassThru
           if (!$p.WaitForExit(300000)) { $p.Kill(); Say 'screenshot tour hung' }
