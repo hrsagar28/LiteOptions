@@ -275,12 +275,13 @@ namespace LiteOptions.SettingsApp
 
         public UIElement Control { get => right.Content as UIElement; set => right.Content = value; }
 
-        bool row;
+        bool row, indented;
 
         /// <summary>Indented look for cards that belong to the card above.</summary>
         public SettingCard Indent()
         {
-            Box.Padding = new Thickness(56, 10, 16, 10);
+            indented = true;
+            Box.Padding = new Thickness(40, 10, 16, 10); // with the icon column's gap, the text lines up with the row above
             Box.MinHeight = 56;
             return this;
         }
@@ -289,9 +290,8 @@ namespace LiteOptions.SettingsApp
         public SettingCard AsRow()
         {
             row = true;
-            var pad = Box.Padding;
             Box.Style = Ui.Style("CardRow");
-            if (pad.Left > 40) { Box.Padding = new Thickness(56, 10, 16, 10); Box.MinHeight = 56; }
+            if (indented) { Box.Padding = new Thickness(40, 10, 16, 10); Box.MinHeight = 56; }
             return this;
         }
 

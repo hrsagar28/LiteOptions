@@ -13,7 +13,7 @@ namespace LiteOptions.SettingsApp
     public static class Entry
     {
         public static string[] Args = new string[0];
-        public static bool Demo, SelfTest, Tray;
+        public static bool Demo, SelfTest, Tray, Dark;
         public static string ShotsDir, SelfTestFile;
         static EventWaitHandle showEvent, trayEvent;
         const string ShowName = @"Local\LiteOptions.SettingsUI.Show", TrayName = @"Local\LiteOptions.SettingsUI.Tray";
@@ -27,6 +27,7 @@ namespace LiteOptions.SettingsApp
             ShotsDir = After("--shots");
             Demo = Has("--demo") || ShotsDir != null;
             Tray = Has("--tray") && !SelfTest && ShotsDir == null;
+            Dark = Has("--dark"); // screenshots in the dark theme
 
             if (!SelfTest && ShotsDir == null)
             {
@@ -88,6 +89,7 @@ namespace LiteOptions.SettingsApp
 
         public App()
         {
+            if (Entry.Dark) RequestedTheme = ApplicationTheme.Dark;
             InitializeComponent();
             UnhandledException += (s, e) =>
             {

@@ -215,7 +215,8 @@ namespace LiteOptions.SettingsApp
 
             Content = root;
             SetTitleBar(titleRow);
-            root.Loaded += (s, e) => { Ui.Root = root.XamlRoot; UpdateCaptionInset(); UpdateDragRegions(); };
+            root.Loaded += (s, e) => { Ui.Root = root.XamlRoot; UpdateCaptionInset(); UpdateDragRegions(); ApplyCaptionColors(); };
+            root.ActualThemeChanged += (s, e) => ApplyCaptionColors();
             // Like Windows Settings: below a certain width the menu folds away behind a ☰ button in the title bar
             root.SizeChanged += (s, e) => { UpdatePaneMode(e.NewSize.Width); UpdateCaptionInset(); UpdateDragRegions(); };
 
@@ -276,6 +277,8 @@ namespace LiteOptions.SettingsApp
         internal string CurrentTag => pages.FirstOrDefault(x => x.page == current).tag;
 
         internal void ScrollToEnd() => scroller.ChangeView(null, scroller.ScrollableHeight, null, true);
+
+        internal void ScrollTo(double offset) => scroller.ChangeView(null, Math.Min(offset, scroller.ScrollableHeight), null, true);
 
         internal void ReloadPages()
         {
@@ -471,6 +474,25 @@ namespace LiteOptions.SettingsApp
             paneButton.Visibility = narrow ? Visibility.Visible : Visibility.Collapsed;
             logo.Margin = new Thickness(narrow ? 8 : 16, 0, 12, 0);
             DispatcherQueue.TryEnqueue(UpdateDragRegions);
+        }
+
+        /// <summary>Minimise / maximise / close in the colours of the theme (they don't follow it by themselves in a custom title bar).</summary>
+        void ApplyCaptionColors()
+        {
+            try
+            {
+                bool dark = root.ActualTheme == ElementTheme.Dark;
+                var tb = AppWindow.TitleBar;
+                tb.ButtonBackgroundColor = Colors.Transparent;
+                tb.ButtonInactiveBackgroundColor = Colors.Transparent;
+                tb.ButtonForegroundColor = dark ? Colors.White : Colors.Black;
+                tb.ButtonInactiveForegroundColor = dark ? Windows.UI.Color.FromArgb(255, 150, 150, 150) : Windows.UI.Color.FromArgb(255, 120, 120, 120);
+                tb.ButtonHoverBackgroundColor = dark ? Windows.UI.Color.FromArgb(24, 255, 255, 255) : Windows.UI.Color.FromArgb(18, 0, 0, 0);
+                tb.ButtonHoverForegroundColor = dark ? Colors.White : Colors.Black;
+                tb.ButtonPressedBackgroundColor = dark ? Windows.UI.Color.FromArgb(16, 255, 255, 255) : Windows.UI.Color.FromArgb(10, 0, 0, 0);
+                tb.ButtonPressedForegroundColor = dark ? Colors.White : Colors.Black;
+            }
+            catch { }
         }
 
         /// <summary>Leave room on the right for the minimise / maximise / close buttons.</summary>

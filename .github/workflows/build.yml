@@ -152,6 +152,8 @@ jobs:
           # 3. pictures of every page and dialog, with pretend devices
           $p = Start-Process $ui -ArgumentList '--shots', (Join-Path $r 'shots') -PassThru
           if (!$p.WaitForExit(300000)) { $p.Kill(); Say 'screenshot tour hung' }
+          $p = Start-Process $ui -ArgumentList '--shots', (Join-Path $r 'shots'), '--dark' -PassThru
+          if (!$p.WaitForExit(300000)) { $p.Kill(); Say 'dark screenshot tour hung' }
           Say "screenshots taken: $((Get-ChildItem (Join-Path $r 'shots') -Filter *.png -ErrorAction SilentlyContinue).Count)"
 
           Copy-Item (Join-Path $cfg 'log.txt') $r -ErrorAction SilentlyContinue

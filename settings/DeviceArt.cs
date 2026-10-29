@@ -130,6 +130,22 @@ namespace LiteOptions.SettingsApp
             callouts[id] = (title, v, b, new UIElement[] { line, halo, dot, b });
         }
 
+        /// <summary>Move a label's dot to another part of the photo; the label follows so its line stays straight.</summary>
+        public void PointCallout(string id, double dotX, double dotY)
+        {
+            if (!callouts.TryGetValue(id, out var c)) return;
+            var line = (FrameworkElement)c.parts[0];
+            var halo = (FrameworkElement)c.parts[1];
+            var dot = (FrameworkElement)c.parts[2];
+            var b = c.button;
+            double labelRight = Canvas.GetLeft(b) + (double.IsNaN(b.Width) ? 0 : b.Width);
+            Canvas.SetLeft(halo, dotX - 3); Canvas.SetTop(halo, dotY - 3);
+            Canvas.SetLeft(dot, dotX); Canvas.SetTop(dot, dotY);
+            Canvas.SetTop(b, dotY - 16);
+            Canvas.SetLeft(line, labelRight); Canvas.SetTop(line, dotY + 4);
+            line.Width = Math.Max(0, dotX - labelRight + 4);
+        }
+
         /// <summary>Set a label's value; null hides that label (for a setting the device doesn't have).</summary>
         public void SetCallout(string id, string value)
         {

@@ -404,6 +404,7 @@ namespace LiteOptions.SettingsApp
                 store.Settings.DisabledKeys = mask;
                 store.Save();
                 hero.SetCallout("keysoff", keysOff.Summary(mask));
+                PointKeysOff(mask);
             };
             Find(keysOff, "turn off disable keys caps lock insert windows key scroll lock", "Turn off keys");
 
@@ -520,6 +521,13 @@ namespace LiteOptions.SettingsApp
             fnCard.Description = state + (sc != null ? " Press " + KeyNames.Combo(sc.Mods, sc.Vk) + " to switch any time." : "");
         }
 
+        /// <summary>Point the "Turned off" label at the Windows key when that's the only key off, otherwise at Caps Lock.</summary>
+        void PointKeysOff(int mask)
+        {
+            if ((mask & ~16) == 0 && (mask & 16) != 0) hero.PointCallout("keysoff", 258, 249);
+            else hero.PointCallout("keysoff", 204, 185);
+        }
+
         public override void LoadDevices()
         {
             var k = store.Keyboard;
@@ -535,6 +543,7 @@ namespace LiteOptions.SettingsApp
                 int shown = store.Settings.DisabledKeys >= 0 ? store.Settings.DisabledKeys & k.DisableCaps : Math.Max(0, k.DisabledKeys);
                 keysOff.Load(k.DisableCaps, shown);
                 hero.SetCallout("keysoff", keysOff.Summary(shown));
+                PointKeysOff(shown);
             }
             else hero.SetCallout("keysoff", null);
 

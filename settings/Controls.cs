@@ -224,7 +224,7 @@ namespace LiteOptions.SettingsApp
             };
             var badge = new Border
             {
-                Width = 24, Height = 24, CornerRadius = new CornerRadius(12), Child = badgeText,
+                Width = 24, Height = 24, CornerRadius = new CornerRadius(12), Child = badgeText, HorizontalAlignment = HorizontalAlignment.Left,
                 Background = current ? Ui.Brush("AccentFillColorDefaultBrush") : new SolidColorBrush(Colors.Transparent),
                 BorderBrush = Ui.Brush("TextFillColorSecondaryBrush"), BorderThickness = new Thickness(current ? 0 : 1),
             };

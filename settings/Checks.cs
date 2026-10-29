@@ -114,10 +114,8 @@ namespace LiteOptions.SettingsApp
             {
                 Directory.CreateDirectory(dir);
                 await Task.Delay(3000);
-                await Tour(w, store, dir, "");
-                w.SetTheme(ElementTheme.Dark);
-                await Task.Delay(800);
-                await Tour(w, store, dir, "dark-");
+                // run once as it starts (light), and again with --dark: the whole app then starts in the dark theme, as it does on a dark Windows
+                await Tour(w, store, dir, Entry.Dark ? "dark-" : "");
             }
             catch (Exception ex) { File.WriteAllText(Path.Combine(dir, "error.txt"), ex.ToString()); }
             Environment.Exit(0);
@@ -129,8 +127,11 @@ namespace LiteOptions.SettingsApp
             async Task close() { Ui.Current?.Hide(); await Task.Delay(500); }
 
             w.ShowPage("mouse"); await snap("01-mouse");
+            w.ScrollTo(520); await snap("01b-mouse-buttons");
+            w.ScrollTo(1040); await snap("01c-mouse-pointer");
             w.ScrollToEnd(); await snap("02-mouse-lower");
             w.ShowPage("keys"); await snap("03-keyboard");
+            w.ScrollTo(480); await snap("03b-keyboard-middle");
             w.ScrollToEnd(); await snap("04-keyboard-lower");
             w.ShowPage("settings"); await snap("05-settings");
             w.ScrollToEnd(); await snap("06-settings-lower");
@@ -141,7 +142,6 @@ namespace LiteOptions.SettingsApp
             w.ClearSearch();
 
             var panel = new TrayFlyout(store, _ => { });
-            panel.SetTheme(Ui.Theme);
             panel.ShowFlyout();
             await Task.Delay(1500);
             try { await SaveScreen(panel.Handle, Path.Combine(dir, prefix + "22-tray.png")); } catch (Exception ex) { File.AppendAllText(Path.Combine(dir, "errors.txt"), "22-tray (screen): " + ex.Message + Environment.NewLine); }
