@@ -292,7 +292,12 @@ namespace LiteOptions.SettingsApp
                 var k = keys[i];
                 var cap = Ui.Cap(k.cap);
                 var box = new CheckBox { IsChecked = disabled >= 0 && (disabled & k.bit) != 0, MinWidth = 0, Padding = new Thickness(8, 0, 0, 0), VerticalContentAlignment = VerticalAlignment.Center };
-                box.Content = Ui.Row(10, cap, Ui.Text(k.name, "BodyTextBlockStyle", wrap: false));
+                var label = Ui.Text(k.name, "BodyTextBlockStyle", wrap: false);
+                label.VerticalAlignment = VerticalAlignment.Center;
+                cap.VerticalAlignment = VerticalAlignment.Center;
+                var row = Ui.Row(10, cap, label);
+                row.VerticalAlignment = VerticalAlignment.Center;
+                box.Content = row;
                 Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(box, "Turn off " + k.name);
                 var tile = new Border { Style = Ui.Style("Tile"), Padding = new Thickness(12, 8, 12, 8), Child = box };
                 box.Checked += (s, e) => Toggled();
