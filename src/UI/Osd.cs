@@ -27,14 +27,24 @@ namespace LiteOptions.UI
         static int detailedLogs = 4; // log the first few pop-ups in full, so a "nothing appeared" report can be diagnosed
         static bool logShown;
 
-        public static void Show(string glyph, string title, string subtitle = null, double? progress = null)
+        /// <summary>How the icon on the left is drawn.</summary>
+        public enum Badge
+        {
+            None,    // the glyph on its own
+            Filled,  // the glyph in a filled circle, for a state that should stand out (microphone muted)
+            Tinted,  // the glyph on an accent-tinted square (gestures)
+            KeyCap,  // "glyph" is a key label drawn on a key cap (Caps Lock: "A")
+        }
+
+        /// <param name="light">For a lock key: true draws its light on the right, false an empty one, null none.</param>
+        public static void Show(string glyph, string title, string subtitle = null, double? progress = null, Badge badge = Badge.None, bool? light = null)
         {
             if (!Enabled || !Native.IsWindows) return;
-            try { Display(glyph, title, subtitle, progress); }
+            try { Display(glyph, title, subtitle, progress, badge, light); }
             catch (Exception ex) { Logger.Write("pop-up failed: " + ex.Message); }
         }
 
-        static void Display(string glyph, string title, string subtitle, double? progress)
+        static void Display(string glyph, string title, string subtitle, double? progress, Badge badge, bool? light)
         {
             if (timer == null) { timer = new Timer { Interval = 15 }; timer.Tick += (s, e) => Step(); }
             var screens = Screen.AllScreens;
@@ -46,7 +56,7 @@ namespace LiteOptions.UI
             var notes = new List<string>();
             foreach (var w in windows)
             {
-                w.SetContent(glyph, title, subtitle, progress);
+                w.SetContent(glyph, title, subtitle, progress, badge, light);
                 notes.Add(w.Describe());
             }
             if (phase == 0 || phase == 3) phase = 1; // fade in (or back in, if it was fading out)
@@ -117,14 +127,17 @@ namespace LiteOptions.UI
                 });
             }
 
-            public void SetContent(string glyph, string title, string subtitle, double? progress)
+            public void SetContent(string glyph, string title, string subtitle, double? progress, Badge badge, bool? light)
             {
                 var b = screen.Bounds;
                 int dpi = Native.DpiAt(new Point(b.Left + b.Width / 2, b.Top + b.Height / 2), Theme.SystemDpi);
-                var bmp = Render(dpi / 96f, glyph, title, subtitle, progress, Theme.Dark);
+                float k = dpi / 96f;
+                var bmp = Render(k, glyph, title, subtitle, progress, Theme.Dark, badge, light);
                 SetFrame(bmp);
                 var wa = screen.WorkingArea;
-                pos = new Native.POINT { X = wa.Left + (wa.Width - size.cx) / 2, Y = wa.Bottom - size.cy - (int)(36 * dpi / 96f) };
+                // the card's bottom edge sits where Windows' own volume pop-up sits: 14 px above the taskbar
+                float cardBottom = size.cy - ShadowSize * 1.3f * k;
+                pos = new Native.POINT { X = wa.Left + (wa.Width - size.cx) / 2, Y = wa.Bottom - (int)Math.Round(14 * k + cardBottom) };
             }
 
             public string Describe() => $"{size.cx}x{size.cy} at {pos.X},{pos.Y} on {screen.Bounds.Width}x{screen.Bounds.Height}{(screen.Primary ? " (main)" : "")}";
@@ -177,11 +190,14 @@ namespace LiteOptions.UI
             }
         }
 
+        const float ShadowSize = 14;
+
         /// <summary>
-        /// Draws the pop-up in the style of Windows 11's own volume and brightness pop-ups (public so tests can render it).
+        /// Draws the pop-up in the size and style of Windows 11's own volume and brightness pop-ups (public so tests can render it).
         /// Two layouts: icon + title (+ subtitle), or icon + bar + value when there's a level to show.
         /// </summary>
-        public static Bitmap Render(float k, string glyph, string title, string subtitle, double? progress, bool dark)
+        public static Bitmap Render(float k, string glyph, string title, string subtitle, double? progress, bool dark,
+                                    Badge badge = Badge.None, bool? light = null)
         {
             Color bg = dark ? Color.FromArgb(250, 44, 44, 44) : Color.FromArgb(252, 249, 249, 249);
             Color border = dark ? Color.FromArgb(255, 66, 66, 66) : Color.FromArgb(255, 222, 222, 222);
@@ -190,19 +206,25 @@ namespace LiteOptions.UI
             Color accent = dark ? Color.FromArgb(76, 194, 255) : Color.FromArgb(0, 95, 184);
             Color track = dark ? Color.FromArgb(150, 150, 150) : Color.FromArgb(138, 138, 138);
 
+            bool bar = progress != null;
             using (var titleFont = new Font("Segoe UI Semibold", 14f * k, GraphicsUnit.Pixel))
+            using (var valueFont = new Font("Segoe UI", 14f * k, GraphicsUnit.Pixel))
             using (var subFont = new Font("Segoe UI", 12f * k, GraphicsUnit.Pixel))
-            using (var iconFont = new Font(Theme.IconFamily, 20f * k, GraphicsUnit.Pixel))
+            using (var iconFont = new Font(Theme.IconFamily, (badge == Badge.None ? 16f : 14f) * k, GraphicsUnit.Pixel))
+            using (var capFont = new Font("Segoe UI Semibold", 11f * k, GraphicsUnit.Pixel))
             using (var measure = new Bitmap(1, 1))
             using (var mg = Graphics.FromImage(measure))
             {
                 mg.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-                float tw = mg.MeasureString(title ?? "", titleFont).Width;
-                float sw = string.IsNullOrEmpty(subtitle) ? 0 : mg.MeasureString(subtitle, subFont).Width;
-                float pad = 20 * k, icon = 22 * k, gap = 14 * k, shadow = 14 * k;
-                bool bar = progress != null;
-                float w = bar ? 300 * k : Math.Max(220 * k, Math.Min(460 * k, pad + icon + gap + Math.Max(tw, sw) + pad + 4 * k));
-                float h = (bar || string.IsNullOrEmpty(subtitle) ? 56 : 64) * k;
+                float tw = mg.MeasureString(title ?? "", bar ? valueFont : titleFont).Width;
+                float sw = string.IsNullOrEmpty(subtitle) || bar ? 0 : mg.MeasureString(subtitle, subFont).Width;
+                float pad = 16 * k, gap = 12 * k, shadow = ShadowSize * k;
+                float iconBox = (badge == Badge.None ? 20 : 28) * k;
+                float lightW = light != null && !bar ? gap + 8 * k : 0;
+                float minW = 192 * k; // the width of Windows' volume pop-up
+                float w = bar ? Math.Max(minW, pad + iconBox + gap + 100 * k + gap + tw + pad)
+                              : Math.Max(minW, Math.Min(420 * k, pad + iconBox + gap + Math.Max(tw, sw) + 2 * k + lightW + pad));
+                float h = (bar || sw == 0 ? 48 : 56) * k;
                 var bmp = new Bitmap((int)Math.Ceiling(w + shadow * 2), (int)Math.Ceiling(h + shadow * 2), PixelFormat.Format32bppPArgb);
                 using (var g = Graphics.FromImage(bmp))
                 {
@@ -213,26 +235,27 @@ namespace LiteOptions.UI
                     // soft shadow: a few expanding translucent outlines
                     for (int i = 6; i >= 1; i--)
                     {
-                        var r = RectangleF.Inflate(box, i * 1.6f * k, i * 1.6f * k);
+                        var r = RectangleF.Inflate(box, i * 1.4f * k, i * 1.4f * k);
                         r.Offset(0, 3 * k);
-                        using (var p = Theme.Rounded(r, 8 * k + i * 1.6f * k))
-                        using (var b = new SolidBrush(Color.FromArgb(dark ? 16 : 9, 0, 0, 0))) g.FillPath(b, p);
+                        using (var p = Theme.Rounded(r, 8 * k + i * 1.4f * k))
+                        using (var b = new SolidBrush(Color.FromArgb(dark ? 16 : 8, 0, 0, 0))) g.FillPath(b, p);
                     }
                     using (var p = Theme.Rounded(box, 8 * k))
                     {
                         using (var b = new SolidBrush(bg)) g.FillPath(b, p);
                         using (var pen = new Pen(border, Math.Max(1f, k))) g.DrawPath(pen, p);
                     }
-                    var iconRect = new RectangleF(box.X + pad - 6 * k, box.Y, icon + 12 * k, h);
-                    using (var b = new SolidBrush(text))
-                    using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
-                        g.DrawString(glyph ?? "", iconFont, b, iconRect, sf);
-                    float x = box.X + pad + icon + gap;
+
+                    // the icon, in its box on the left
+                    var ib = new RectangleF(box.X + pad, box.Y + (h - iconBox) / 2, iconBox, iconBox);
+                    DrawBadge(g, ib, k, badge, glyph, iconFont, capFont, dark, text, accent);
+
+                    float x = ib.Right + gap;
                     float right = box.Right - pad;
                     if (bar)
                     {
                         // icon · bar · value, like the volume pop-up
-                        float valueW = Math.Min(130 * k, tw + 2 * k);
+                        float valueW = tw + 2 * k;
                         float barW = Math.Max(40 * k, right - x - gap - valueW);
                         float by = box.Y + (h - 4 * k) / 2;
                         using (var tp = Theme.Rounded(new RectangleF(x, by, barW, 4 * k), 2 * k))
@@ -242,24 +265,69 @@ namespace LiteOptions.UI
                         using (var fb = new SolidBrush(accent)) g.FillPath(fb, fp);
                         using (var b = new SolidBrush(text))
                         using (var sf = new StringFormat { Alignment = StringAlignment.Far, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
-                            g.DrawString(title ?? "", titleFont, b, new RectangleF(right - valueW - 2 * k, box.Y, valueW + 4 * k, h), sf);
+                            g.DrawString(title ?? "", valueFont, b, new RectangleF(right - valueW - 2 * k, box.Y, valueW + 4 * k, h), sf);
                     }
                     else
                     {
-                        float textW = right - x;
-                        bool two = !string.IsNullOrEmpty(subtitle);
-                        float ty = two ? box.Y + 12 * k : box.Y + (h - titleFont.Height) / 2;
+                        float textW = right - x - lightW;
+                        bool two = sw > 0;
+                        float th = titleFont.GetHeight(), sh = subFont.GetHeight();
+                        float ty = box.Y + (h - (two ? th + sh : th)) / 2;
                         using (var b = new SolidBrush(text))
                         using (var sf = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
-                            g.DrawString(title ?? "", titleFont, b, new RectangleF(x, ty, textW, titleFont.Height + 4), sf);
+                            g.DrawString(title ?? "", titleFont, b, new RectangleF(x, ty, textW, th + 2 * k), sf);
                         if (two)
                             using (var b = new SolidBrush(muted))
                             using (var sf = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
-                                g.DrawString(subtitle, subFont, b, new RectangleF(x, box.Y + 33 * k, textW, subFont.Height + 4), sf);
+                                g.DrawString(subtitle, subFont, b, new RectangleF(x, ty + th, textW, sh + 2 * k), sf);
+                        if (light != null)
+                        {
+                            // the key's light: filled when on, an empty ring when off
+                            float d = 8 * k;
+                            var dot = new RectangleF(right - d, box.Y + (h - d) / 2, d, d);
+                            if (light.Value) using (var b = new SolidBrush(accent)) g.FillEllipse(b, dot);
+                            else using (var pen = new Pen(muted, Math.Max(1f, 1.2f * k))) g.DrawEllipse(pen, RectangleF.Inflate(dot, -0.6f * k, -0.6f * k));
+                        }
                     }
                 }
                 return bmp;
             }
+        }
+
+        static void DrawBadge(Graphics g, RectangleF ib, float k, Badge badge, string glyph, Font iconFont, Font capFont, bool dark, Color text, Color accent)
+        {
+            Color fore = text;
+            switch (badge)
+            {
+                case Badge.Filled:
+                    using (var b = new SolidBrush(dark ? Color.White : Color.FromArgb(27, 27, 27))) g.FillEllipse(b, ib);
+                    fore = dark ? Color.FromArgb(27, 27, 27) : Color.White;
+                    break;
+                case Badge.Tinted:
+                    using (var p = Theme.Rounded(ib, 6 * k))
+                    using (var b = new SolidBrush(dark ? Color.FromArgb(48, accent) : Color.FromArgb(235, 243, 251))) g.FillPath(b, p);
+                    fore = accent;
+                    break;
+                case Badge.KeyCap:
+                {
+                    // a key: light face, thin outline and a deeper bottom edge
+                    float cw = Math.Max(22 * k, g.MeasureString(glyph ?? "", capFont).Width + 8 * k), ch = 20 * k;
+                    var cap = new RectangleF(ib.X + (ib.Width - cw) / 2, ib.Y + (ib.Height - ch) / 2, cw, ch);
+                    Color face = dark ? Color.FromArgb(62, 62, 62) : Color.White;
+                    Color edge = dark ? Color.FromArgb(110, 110, 110) : Color.FromArgb(201, 201, 201);
+                    using (var p = Theme.Rounded(new RectangleF(cap.X, cap.Y, cap.Width, cap.Height + 1.5f * k), 4 * k))
+                    using (var b = new SolidBrush(edge)) g.FillPath(b, p);
+                    using (var p = Theme.Rounded(new RectangleF(cap.X + k, cap.Y + k, cap.Width - 2 * k, cap.Height - 1.5f * k), 3.2f * k))
+                    using (var b = new SolidBrush(face)) g.FillPath(b, p);
+                    using (var b = new SolidBrush(text))
+                    using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                        g.DrawString(glyph ?? "", capFont, b, new RectangleF(cap.X, cap.Y, cap.Width, cap.Height - k), sf);
+                    return;
+                }
+            }
+            using (var b = new SolidBrush(fore))
+            using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                g.DrawString(glyph ?? "", iconFont, b, new RectangleF(ib.X - 4 * k, ib.Y, ib.Width + 8 * k, ib.Height), sf);
         }
 
     }

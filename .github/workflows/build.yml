@@ -222,6 +222,12 @@ jobs:
 
             Double-click it to install or update (your settings are kept). Windows may say "Windows protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
 
+            Fixed in 2.2.1:
+            - Pop-ups are now the size of Windows' own volume pop-up and sit at the same height above the taskbar.
+            - Caps Lock and Num Lock pop-ups show the key and its light; a muted microphone and gestures get their own icons.
+            - On big or maximised windows the settings stay in one column on the left instead of running off the right edge.
+            - Switches no longer leave a gap at the end of each row.
+
             New in 2.2: a redesigned settings window
             - A cleaner layout in the style of Windows 11 Settings: grouped settings, clearer headings and more breathing room.
             - A big picture of your mouse and keyboard with labels showing what each part does. Click a label to go to that setting.

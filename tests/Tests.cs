@@ -475,7 +475,9 @@ namespace LiteOptions.Tests
             using (var pop = LiteOptions.UI.Osd.Render(1.5f, "\uE765", "F1–F12 keys first", "Hold Fn for media keys", null, false))
                 Check(pop.Width > 300 && pop.Height > 100 && pop.GetPixel(0, 0).A == 0, $"pop-up renders with transparent edges ({pop.Width}×{pop.Height})");
             using (var pop = LiteOptions.UI.Osd.Render(1f, "\uE962", "1600 DPI", "Mouse sensitivity", 0.33, true))
-                Check(pop.Width >= 240, "DPI pop-up with progress bar renders");
+                Check(pop.Width >= 220 && pop.Height < 90, $"DPI pop-up with progress bar renders, about Windows' size ({pop.Width}×{pop.Height})");
+            using (var pop = LiteOptions.UI.Osd.Render(1f, "A", "Caps Lock on", "Letters type in capitals", null, false, LiteOptions.UI.Osd.Badge.KeyCap, true))
+                Check(pop.Height < 90 && pop.Width < 300, $"Caps Lock pop-up with a key cap and its light ({pop.Width}×{pop.Height})");
         }
 
         static void Misc()
