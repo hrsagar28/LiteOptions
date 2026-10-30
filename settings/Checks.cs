@@ -84,14 +84,17 @@ namespace LiteOptions.SettingsApp
 
                 // switching between light and dark while open recolours what was drawn from code
                 var textBefore = Ui.ColorOf("TextFillColorPrimaryBrush");
+                var stageBefore = Ui.ColorOf("SolidBackgroundFillColorSecondaryBrush");
                 var other = w.RootElement.ActualTheme == ElementTheme.Dark ? ElementTheme.Light : ElementTheme.Dark;
                 w.SetTheme(other); await Task.Delay(700);
                 var switched = Ui.ColorOf("TextFillColorPrimaryBrush");
+                var stageSwitched = Ui.ColorOf("SolidBackgroundFillColorSecondaryBrush");
                 w.SetTheme(other == ElementTheme.Dark ? ElementTheme.Light : ElementTheme.Dark); await Task.Delay(700);
                 var textBack = Ui.ColorOf("TextFillColorPrimaryBrush");
                 w.SetTheme(ElementTheme.Default); await Task.Delay(300);
                 if (Equals(switched, textBefore) || !Equals(textBack, textBefore)) { Finish(false, $"theme switch: text colour {textBefore} -> {switched} -> {textBack}"); return; }
-                log.Add($"theme switch: colours follow light and dark ({textBefore} -> {switched} -> {textBack})");
+                if (Equals(stageSwitched, stageBefore)) { Finish(false, $"theme switch: picture background stayed {stageBefore}"); return; }
+                log.Add($"theme switch: colours follow light and dark (text {textBefore} -> {switched} -> {textBack}, picture background {stageBefore} -> {stageSwitched})");
 
                 string dir = string.IsNullOrEmpty(Entry.SelfTestFile) ? null : Path.GetDirectoryName(Path.GetFullPath(Entry.SelfTestFile));
                 if (dir != null) { await Task.Delay(1200); await Shots.CaptureAsync(w, dir, "selftest-window"); }

@@ -32,7 +32,8 @@ namespace LiteOptions.SettingsApp
         public static Style Style(string key) => (Style)Application.Current.Resources[key];
         /// <summary>
         /// A theme colour for code-built controls. Brushes set from code don't follow a light/dark switch by themselves
-        /// (only XAML's {ThemeResource} does), so each key gets one shared brush that <see cref="ApplyTheme"/> recolours.
+        /// (only XAML's {ThemeResource} does), so each key gets one shared brush, and a hidden "probe" in each window
+        /// holds the same key as a real {ThemeResource}; on a switch, <see cref="ApplyTheme"/> copies the probes' new colours.
         /// </summary>
         public static Brush Brush(string key)
         {
@@ -45,6 +46,7 @@ namespace LiteOptions.SettingsApp
                     if (!(b is SolidColorBrush sc)) return b; // not a plain colour: used as it is
                     var mine = new SolidColorBrush(sc.Color) { Opacity = sc.Opacity };
                     lock (live) live[key] = mine;
+                    foreach (var h in probeHosts) AddProbe(h, key);
                     return mine;
                 }
             }
@@ -53,53 +55,52 @@ namespace LiteOptions.SettingsApp
         }
 
         static readonly Dictionary<string, SolidColorBrush> live = new Dictionary<string, SolidColorBrush>();
-        static ElementTheme applied = ElementTheme.Default;
+        static readonly List<Panel> probeHosts = new List<Panel>();
+        static readonly Dictionary<Panel, Dictionary<string, Border>> probes = new Dictionary<Panel, Dictionary<string, Border>>();
 
-        /// <summary>Recolour every brush handed out by <see cref="Brush"/> for a light or dark theme (on a theme switch).</summary>
-        public static void ApplyTheme(ElementTheme theme)
+        /// <summary>A window's root panel takes the probes (zero-size, invisible, but in the tree so their theme follows it).</summary>
+        public static void AddProbeHost(Panel host)
         {
-            if (theme == ElementTheme.Default || theme == applied) return;
-            applied = theme;
-            string name = theme == ElementTheme.Dark ? "Dark" : "Light";
+            if (host == null || probeHosts.Contains(host)) return;
+            probeHosts.Add(host);
+            probes[host] = new Dictionary<string, Border>();
+            List<string> keys;
+            lock (live) keys = live.Keys.ToList();
+            foreach (var k in keys) AddProbe(host, k);
+        }
+
+        static void AddProbe(Panel host, string key)
+        {
+            try
+            {
+                if (probes[host].ContainsKey(key)) return;
+                var p = (Border)Microsoft.UI.Xaml.Markup.XamlReader.Load(
+                    "<Border xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" Width=\"0\" Height=\"0\" IsHitTestVisible=\"False\" Background=\"{ThemeResource " + key + "}\"/>");
+                host.Children.Add(p);
+                probes[host][key] = p;
+            }
+            catch (Exception ex) { try { Logger.Write("theme probe " + key + ": " + ex.Message); } catch { } }
+        }
+
+        /// <summary>After a light/dark switch: give every shared brush the colour its probe in this window now has.</summary>
+        public static void ApplyTheme(Panel host)
+        {
+            if (host == null || !probes.TryGetValue(host, out var mine)) return;
+            int done = 0;
             List<KeyValuePair<string, SolidColorBrush>> all;
             lock (live) all = live.ToList();
-            int done = 0;
             foreach (var kv in all)
-            {
-                if (FindThemed(Application.Current.Resources, kv.Key, name, 0) is SolidColorBrush c)
+                if (mine.TryGetValue(kv.Key, out var p) && p.Background is SolidColorBrush c)
                 {
                     kv.Value.Color = c.Color;
                     kv.Value.Opacity = c.Opacity;
                     done++;
                 }
-            }
-            try { Logger.Write($"Settings window: {name} theme, {done} of {all.Count} colours updated"); } catch { }
+            try { Logger.Write($"Settings window: {host.ActualTheme} theme, {done} of {all.Count} colours updated"); } catch { }
         }
 
         /// <summary>For the self-test: the colour a brush key has right now.</summary>
         internal static Windows.UI.Color? ColorOf(string key) => (Brush(key) as SolidColorBrush)?.Color;
-
-        /// <summary>Looks a key up in the light or dark theme dictionaries (WinUI keys its dark set "Default").</summary>
-        static object FindThemed(ResourceDictionary d, string key, string theme, int depth)
-        {
-            if (d == null || depth > 8) return null;
-            try
-            {
-                foreach (var name in theme == "Dark" ? new[] { "Dark", "Default" } : new[] { "Light" })
-                {
-                    if (d.ThemeDictionaries.TryGetValue(name, out var t) && t is ResourceDictionary td)
-                    {
-                        if (td.TryGetValue(key, out var v)) return v;
-                        foreach (var m in td.MergedDictionaries) { var r = FindThemed(m, key, theme, depth + 1) ?? Plain(m, key); if (r != null) return r; }
-                    }
-                }
-                foreach (var m in d.MergedDictionaries) { var r = FindThemed(m, key, theme, depth + 1); if (r != null) return r; }
-            }
-            catch { }
-            return null;
-        }
-
-        static object Plain(ResourceDictionary d, string key) { try { return d.TryGetValue(key, out var v) ? v : null; } catch { return null; } }
 
         public static FontIcon Icon(string glyph, double size = 16) => new FontIcon { Glyph = glyph, FontSize = size };
 
