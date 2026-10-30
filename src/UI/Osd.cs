@@ -259,8 +259,11 @@ namespace LiteOptions.UI
                 if (shown) Native.InvalidateRect(Handle, IntPtr.Zero, false);
             }
 
-            /// <summary>Windows' flyout tint: near-white or near-black, mostly opaque, the blur showing through.</summary>
-            bool Tint() => Native.SetAcrylic(Handle, Theme.Dark ? Color.FromArgb(0xC8, 0x2C, 0x2C, 0x2C) : Color.FromArgb(0xC8, 0xF3, 0xF3, 0xF3));
+            /// <summary>
+            /// Windows' own flyout acrylic: #FCFCFC at about 85% in light mode, #2C2C2C at about 96% in dark mode,
+            /// so the blur shows through only a little (thinner tints look muddy grey over a dark wallpaper).
+            /// </summary>
+            bool Tint() => Native.SetAcrylic(Handle, Theme.Dark ? Color.FromArgb(0xF2, 0x2C, 0x2C, 0x2C) : Color.FromArgb(0xD9, 0xFC, 0xFC, 0xFC));
 
             public string Describe() => $"{size.cx}x{size.cy} acrylic at {pos.X},{pos.Y} on {screen.Bounds.Width}x{screen.Bounds.Height}{(screen.Primary ? " (main)" : "")}";
 
