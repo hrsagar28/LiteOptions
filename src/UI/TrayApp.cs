@@ -169,7 +169,7 @@ namespace LiteOptions.UI
             bool on = Control.IsKeyLocked(key);
             string name = vk == Vk.CapsLock ? "Caps Lock" : vk == Vk.NumLock ? "Num Lock" : "Scroll Lock";
             string cap = vk == Vk.CapsLock ? "A" : vk == Vk.NumLock ? "1" : "Sc";
-            Osd.Show(cap, name + (on ? " on" : " off"), vk == Vk.CapsLock && on ? "Letters type in capitals" : null, null, Osd.Badge.KeyCap, on);
+            Osd.Show(cap, name + (on ? " on" : " off"), null, null, Osd.Badge.KeyCap, on);
         }
 
         public void ToggleFn()
