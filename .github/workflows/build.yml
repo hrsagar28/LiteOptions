@@ -222,8 +222,11 @@ jobs:
 
             Double-click it to install or update (your settings are kept). Windows may say "Windows protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
 
+            Fixed in 2.2.3:
+            - Every page lines up: the page title, the All apps button and the settings below share one column, centred beside the menu with equal space on both sides.
+
             Fixed in 2.2.2:
-            - On big or maximised windows the settings sit in a column in the middle of the page, with equal space on both sides, and no longer run off the right edge.
+            - Big or maximised windows no longer push the settings off the right edge.
             - Pointer speed and scroll distance have their own reset buttons, so every row ends at the edge.
 
             Fixed in 2.2.1:

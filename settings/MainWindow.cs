@@ -30,6 +30,7 @@ namespace LiteOptions.SettingsApp
         readonly TextBlock profileText;
         readonly ScrollViewer scroller;
         readonly Border pageHost;
+        readonly Grid header;
         readonly InfoBar engineBar;
         readonly StackPanel devicePanel;
         readonly ProgressRing loadingRing;
@@ -146,7 +147,7 @@ namespace LiteOptions.SettingsApp
             var profileMenu = new MenuFlyout { Placement = FlyoutPlacementMode.BottomEdgeAlignedRight };
             profileMenu.Opening += (s, e) => BuildProfileMenu(profileMenu);
             profileButton.Flyout = profileMenu;
-            var header = new Grid { Margin = new Thickness(40, 24, 40, 6), ColumnSpacing = 16, MinHeight = 40, MaxWidth = ContentMaxWidth };
+            header = new Grid { Margin = new Thickness(40, 24, 40, 6), ColumnSpacing = 16, MinHeight = 40 };
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             Grid.SetColumn(profileButton, 1);
@@ -155,16 +156,15 @@ namespace LiteOptions.SettingsApp
 
             engineBar = new InfoBar
             {
-                Severity = InfoBarSeverity.Warning, IsClosable = false, IsOpen = false, Margin = new Thickness(40, 4, 40, 4), MaxWidth = ContentMaxWidth,
+                Severity = InfoBarSeverity.Warning, IsClosable = false, IsOpen = false, Margin = new Thickness(40, 4, 40, 4),
                 Title = "LiteOptions isn't running in the background",
                 Message = "Your mouse and keyboard aren't being customised, and changes can't be made until it's running."
             };
             var start = Ui.Button("Start it", null, accent: true, click: (s, e) => StartEngine());
             engineBar.ActionButton = start;
 
-            pageHost = new Border { Margin = new Thickness(40, 12, 40, 0), MaxWidth = ContentMaxWidth };
-            // no sideways scrolling: pages are laid out at the window's width (text wraps) instead of their widest line,
-            // so the capped column centres correctly instead of being pushed off to the right
+            pageHost = new Border { Margin = new Thickness(40, 12, 40, 0) };
+            // no sideways scrolling: pages are laid out at the window's width (text wraps) instead of their widest line
             scroller = new ScrollViewer
             {
                 Content = pageHost,
@@ -186,6 +186,8 @@ namespace LiteOptions.SettingsApp
             content.Children.Add(header);
             content.Children.Add(engineBar);
             content.Children.Add(scroller);
+            // one column for the title, the warning and the page, worked out here so every page lines up exactly
+            scroller.SizeChanged += (s, e) => LayoutColumn(e.NewSize.Width);
             content.Children.Add(loadingRing);
 
             // ── navigation: the devices with their battery rings, then the pages ──
@@ -510,6 +512,25 @@ namespace LiteOptions.SettingsApp
                 tb.ButtonPressedForegroundColor = dark ? Colors.White : Colors.Black;
             }
             catch { }
+        }
+
+        /// <summary>
+        /// Puts the title row, the warning and the page in the same column: up to <see cref="ContentMaxWidth"/> wide,
+        /// centred in the area beside the menu, at least 40 from either side. Set as fixed numbers, because letting
+        /// the column centre itself let each page's contents nudge it sideways by a different amount.
+        /// </summary>
+        void LayoutColumn(double available)
+        {
+            if (available <= 0) return;
+            double w = Math.Max(0, Math.Min(ContentMaxWidth, available - 80));
+            double left = Math.Max(40, Math.Floor((available - w) / 2));
+            foreach (FrameworkElement e in new FrameworkElement[] { header, engineBar, pageHost })
+            {
+                e.Width = w;
+                e.HorizontalAlignment = HorizontalAlignment.Left;
+                var m = e.Margin;
+                e.Margin = new Thickness(left, m.Top, 0, m.Bottom);
+            }
         }
 
         /// <summary>Leave room on the right for the minimise / maximise / close buttons.</summary>
