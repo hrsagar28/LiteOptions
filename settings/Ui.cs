@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using LiteOptions.Input;
@@ -29,12 +30,76 @@ namespace LiteOptions.SettingsApp
     static class Ui
     {
         public static Style Style(string key) => (Style)Application.Current.Resources[key];
+        /// <summary>
+        /// A theme colour for code-built controls. Brushes set from code don't follow a light/dark switch by themselves
+        /// (only XAML's {ThemeResource} does), so each key gets one shared brush that <see cref="ApplyTheme"/> recolours.
+        /// </summary>
         public static Brush Brush(string key)
         {
-            try { if (Application.Current.Resources[key] is Brush b) return b; }
+            lock (live)
+                if (live.TryGetValue(key, out var have)) return have;
+            try
+            {
+                if (Application.Current.Resources[key] is Brush b)
+                {
+                    if (!(b is SolidColorBrush sc)) return b; // not a plain colour: used as it is
+                    var mine = new SolidColorBrush(sc.Color) { Opacity = sc.Opacity };
+                    lock (live) live[key] = mine;
+                    return mine;
+                }
+            }
             catch (Exception ex) { try { Logger.Write("missing brush " + key + ": " + ex.Message); } catch { } }
             return new SolidColorBrush(Microsoft.UI.Colors.Gray);
         }
+
+        static readonly Dictionary<string, SolidColorBrush> live = new Dictionary<string, SolidColorBrush>();
+        static ElementTheme applied = ElementTheme.Default;
+
+        /// <summary>Recolour every brush handed out by <see cref="Brush"/> for a light or dark theme (on a theme switch).</summary>
+        public static void ApplyTheme(ElementTheme theme)
+        {
+            if (theme == ElementTheme.Default || theme == applied) return;
+            applied = theme;
+            string name = theme == ElementTheme.Dark ? "Dark" : "Light";
+            List<KeyValuePair<string, SolidColorBrush>> all;
+            lock (live) all = live.ToList();
+            int done = 0;
+            foreach (var kv in all)
+            {
+                if (FindThemed(Application.Current.Resources, kv.Key, name, 0) is SolidColorBrush c)
+                {
+                    kv.Value.Color = c.Color;
+                    kv.Value.Opacity = c.Opacity;
+                    done++;
+                }
+            }
+            try { Logger.Write($"Settings window: {name} theme, {done} of {all.Count} colours updated"); } catch { }
+        }
+
+        /// <summary>For the self-test: the colour a brush key has right now.</summary>
+        internal static Windows.UI.Color? ColorOf(string key) => (Brush(key) as SolidColorBrush)?.Color;
+
+        /// <summary>Looks a key up in the light or dark theme dictionaries (WinUI keys its dark set "Default").</summary>
+        static object FindThemed(ResourceDictionary d, string key, string theme, int depth)
+        {
+            if (d == null || depth > 8) return null;
+            try
+            {
+                foreach (var name in theme == "Dark" ? new[] { "Dark", "Default" } : new[] { "Light" })
+                {
+                    if (d.ThemeDictionaries.TryGetValue(name, out var t) && t is ResourceDictionary td)
+                    {
+                        if (td.TryGetValue(key, out var v)) return v;
+                        foreach (var m in td.MergedDictionaries) { var r = FindThemed(m, key, theme, depth + 1) ?? Plain(m, key); if (r != null) return r; }
+                    }
+                }
+                foreach (var m in d.MergedDictionaries) { var r = FindThemed(m, key, theme, depth + 1); if (r != null) return r; }
+            }
+            catch { }
+            return null;
+        }
+
+        static object Plain(ResourceDictionary d, string key) { try { return d.TryGetValue(key, out var v) ? v : null; } catch { return null; } }
 
         public static FontIcon Icon(string glyph, double size = 16) => new FontIcon { Glyph = glyph, FontSize = size };
 

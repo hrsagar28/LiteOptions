@@ -233,7 +233,8 @@ namespace LiteOptions.SettingsApp
             Content = root;
             SetTitleBar(titleRow);
             root.Loaded += (s, e) => { Ui.Root = root.XamlRoot; UpdateCaptionInset(); UpdateDragRegions(); ApplyCaptionColors(); };
-            root.ActualThemeChanged += (s, e) => ApplyCaptionColors();
+            // a light/dark switch while the window is open: recolour what was drawn from code, and redraw the device pictures
+            root.ActualThemeChanged += (s, e) => { ApplyCaptionColors(); Ui.ApplyTheme(root.ActualTheme); OnDevices(); };
             // Like Windows Settings: below a certain width the menu folds away behind a ☰ button in the title bar
             root.SizeChanged += (s, e) => { UpdatePaneMode(e.NewSize.Width); UpdateCaptionInset(); UpdateDragRegions(); };
 

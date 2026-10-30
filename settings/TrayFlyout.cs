@@ -151,6 +151,7 @@ namespace LiteOptions.SettingsApp
             root.Children.Add(foot);
 
             root.KeyDown += (s, e) => { if (e.Key == Windows.System.VirtualKey.Escape) { e.Handled = true; HideFlyout(); } };
+            root.ActualThemeChanged += (s, e) => { Ui.ApplyTheme(root.ActualTheme); if (Showing) Load(); };
             Content = root;
 
             // a borderless, always-on-top panel that stays out of Alt+Tab and the taskbar

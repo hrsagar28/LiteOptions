@@ -222,6 +222,9 @@ jobs:
 
             Double-click it to install or update (your settings are kept). Windows may say "Windows protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
 
+            Fixed in 2.2.4:
+            - Switching Windows between light and dark while LiteOptions is open now recolours everything straight away (no need to close and reopen it).
+
             Fixed in 2.2.3:
             - Every page lines up: the page title, the All apps button and the settings below share one column, centred beside the menu with equal space on both sides.
 

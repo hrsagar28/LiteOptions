@@ -82,6 +82,17 @@ namespace LiteOptions.SettingsApp
                 if (!folded || !back) { Finish(false, $"menu folding: folded when narrow={folded}, back in full when wide={back}"); return; }
                 log.Add("menu: folds behind the menu button when narrow, back on the left when wide");
 
+                // switching between light and dark while open recolours what was drawn from code
+                var before = Ui.ColorOf("TextFillColorPrimaryBrush");
+                var other = w.RootElement.ActualTheme == ElementTheme.Dark ? ElementTheme.Light : ElementTheme.Dark;
+                w.SetTheme(other); await Task.Delay(700);
+                var switched = Ui.ColorOf("TextFillColorPrimaryBrush");
+                w.SetTheme(other == ElementTheme.Dark ? ElementTheme.Light : ElementTheme.Dark); await Task.Delay(700);
+                var back = Ui.ColorOf("TextFillColorPrimaryBrush");
+                w.SetTheme(ElementTheme.Default); await Task.Delay(300);
+                if (Equals(switched, before) || !Equals(back, before)) { Finish(false, $"theme switch: text colour {before} -> {switched} -> {back}"); return; }
+                log.Add($"theme switch: colours follow light and dark ({before} -> {switched} -> {back})");
+
                 string dir = string.IsNullOrEmpty(Entry.SelfTestFile) ? null : Path.GetDirectoryName(Path.GetFullPath(Entry.SelfTestFile));
                 if (dir != null) { await Task.Delay(1200); await Shots.CaptureAsync(w, dir, "selftest-window"); }
                 Finish(true, "the settings window works with this engine");
@@ -186,6 +197,16 @@ namespace LiteOptions.SettingsApp
             w.ShowPage("mouse"); await snap("25-wide-mouse");
             w.AppWindow.Resize(size);
             await Task.Delay(600);
+
+            if (prefix == "")
+            {
+                // Windows switched to dark while the window is open
+                w.SetTheme(ElementTheme.Dark);
+                w.ShowPage("mouse"); await Task.Delay(600); await snap("26-switched-dark-mouse");
+                w.ShowPage("keys"); await snap("27-switched-dark-keys");
+                w.SetTheme(ElementTheme.Light);
+                w.ShowPage("mouse"); await Task.Delay(600);
+            }
 
             _ = SetupFlow.RunAsync(store);
             await snap("14-setup-1");
