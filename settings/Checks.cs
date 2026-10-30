@@ -83,15 +83,15 @@ namespace LiteOptions.SettingsApp
                 log.Add("menu: folds behind the menu button when narrow, back on the left when wide");
 
                 // switching between light and dark while open recolours what was drawn from code
-                var before = Ui.ColorOf("TextFillColorPrimaryBrush");
+                var textBefore = Ui.ColorOf("TextFillColorPrimaryBrush");
                 var other = w.RootElement.ActualTheme == ElementTheme.Dark ? ElementTheme.Light : ElementTheme.Dark;
                 w.SetTheme(other); await Task.Delay(700);
                 var switched = Ui.ColorOf("TextFillColorPrimaryBrush");
                 w.SetTheme(other == ElementTheme.Dark ? ElementTheme.Light : ElementTheme.Dark); await Task.Delay(700);
-                var back = Ui.ColorOf("TextFillColorPrimaryBrush");
+                var textBack = Ui.ColorOf("TextFillColorPrimaryBrush");
                 w.SetTheme(ElementTheme.Default); await Task.Delay(300);
-                if (Equals(switched, before) || !Equals(back, before)) { Finish(false, $"theme switch: text colour {before} -> {switched} -> {back}"); return; }
-                log.Add($"theme switch: colours follow light and dark ({before} -> {switched} -> {back})");
+                if (Equals(switched, textBefore) || !Equals(textBack, textBefore)) { Finish(false, $"theme switch: text colour {textBefore} -> {switched} -> {textBack}"); return; }
+                log.Add($"theme switch: colours follow light and dark ({textBefore} -> {switched} -> {textBack})");
 
                 string dir = string.IsNullOrEmpty(Entry.SelfTestFile) ? null : Path.GetDirectoryName(Path.GetFullPath(Entry.SelfTestFile));
                 if (dir != null) { await Task.Delay(1200); await Shots.CaptureAsync(w, dir, "selftest-window"); }
