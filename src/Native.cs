@@ -300,6 +300,17 @@ namespace LiteOptions
             finally { Marshal.FreeHGlobal(p); }
         }
 
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern bool DeleteFile(string path);
+
+        /// <summary>
+        /// Removes Windows' "downloaded from the internet" mark (the Zone.Identifier stream) from a file.
+        /// Copying a downloaded file keeps the mark, and SmartScreen then asks again every time the copy is opened.
+        /// </summary>
+        public static bool ClearDownloadMark(string path)
+        {
+            try { return DeleteFile(path + ":Zone.Identifier"); } catch { return false; }
+        }
+
         /// <summary>Windows build number (22621 = Windows 11 22H2), or 0 if unknown.</summary>
         public static int WindowsBuild
         {

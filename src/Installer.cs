@@ -136,6 +136,8 @@ namespace LiteOptions
                     catch (UnauthorizedAccessException ex) { last = ex; Thread.Sleep(300); }
                 }
                 if (last != null) throw last;
+                // the copy inherits the installer's "downloaded" mark; installed programs shouldn't trip SmartScreen on every start
+                Native.ClearDownloadMark(InstalledExe);
                 ExtractPayload();
 
                 string old = OldStartupCopy();

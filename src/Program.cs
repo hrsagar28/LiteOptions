@@ -61,6 +61,10 @@ namespace LiteOptions
                 return 0; // the installed copy has been started
             }
 
+            // an install from before 2.3.3 kept the installer's "downloaded" mark, so SmartScreen asked on every start
+            if (Installer.RunningInstalled && Native.ClearDownloadMark(Application.ExecutablePath))
+                Logger.Write("Cleared the downloaded-file mark from LiteOptions.exe (SmartScreen won't ask on every start)");
+
             using (var mutex = new Mutex(true, @"Local\LiteOptions.Instance", out bool first))
             using (var showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\LiteOptions.Show"))
             using (var exitSignal = new EventWaitHandle(false, EventResetMode.AutoReset, Installer.ExitEventName))

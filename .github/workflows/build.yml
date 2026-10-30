@@ -232,6 +232,9 @@ jobs:
 
             Double-click it to install or update (your settings are kept). Windows may say "Windows protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
 
+            Fixed in 2.3.3:
+            - Windows SmartScreen no longer asks every time LiteOptions starts, only once when you run a newly downloaded installer. (The installed copy kept the installer's "downloaded from the internet" mark.)
+
             Fixed in 2.3.2:
             - Pop-up acrylic has a stronger tint, so it no longer looks grey over a dark wallpaper.
             - The Caps Lock pop-up is just the key, its name and its light (no extra line).
