@@ -64,8 +64,10 @@ namespace LiteOptions
             using (var mutex = new Mutex(true, @"Local\LiteOptions.Instance", out bool first))
             using (var showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\LiteOptions.Show"))
             using (var exitSignal = new EventWaitHandle(false, EventResetMode.AutoReset, Installer.ExitEventName))
+            using (var classicSignal = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\LiteOptions.Classic"))
             {
-                if (!first) { showSignal.Set(); return 0; }
+                // --classic opens the built-in classic window (the fallback when the new window can't start); used to check it still works
+                if (!first) { (args.Contains("--classic") ? classicSignal : showSignal).Set(); return 0; }
 
                 Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
                 Application.ThreadException += (s, e) => Logger.Write("UI error: " + e.Exception);
@@ -79,6 +81,8 @@ namespace LiteOptions
                 var ui = SynchronizationContext.Current;
 
                 new Thread(() => { try { while (showSignal.WaitOne()) app.ShowFromOtherInstance(); } catch { } }) { IsBackground = true }.Start();
+                new Thread(() => { try { while (classicSignal.WaitOne()) ui.Post(_ => app.ShowClassicWindow(), null); } catch { } }) { IsBackground = true }.Start();
+                if (args.Contains("--classic")) ui.Post(_ => app.ShowClassicWindow(), null);
                 new Thread(() => { try { if (exitSignal.WaitOne()) ui.Post(_ => app.ExitThread(), null); } catch { } }) { IsBackground = true }.Start();
 
                 Application.Run(app);

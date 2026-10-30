@@ -19,6 +19,12 @@ namespace LiteOptions.UI
         // shell
         NavItem navMouse, navKeys, navSettings;
         Label pageTitle;
+        // added in 2.2 so the classic window (the fallback when the new one can't start) has the same settings
+        ToggleSwitch smooth, lockPopups;
+        Control mouseHostsHeader, kbHostsHeader, keysOffHeader;
+        CardPanel mouseHostsCard, kbHostsCard, keysOffCard;
+        SettingRow[] mouseHostRows, kbHostRows;
+        readonly List<(int bit, SettingRow row, ToggleSwitch sw)> offRows = new List<(int, SettingRow, ToggleSwitch)>();
         DropDown profileBox;
         FlowLayoutPanel profileBar;
         Panel pageMouse, pageKeys, pageSettings;
@@ -83,6 +89,7 @@ namespace LiteOptions.UI
         void BuildAll()
         {
             SuspendLayout();
+            offRows.Clear(); // rebuilt on a DPI change
             BuildShell();
             BuildMousePage();
             BuildKeysPage();
@@ -310,6 +317,7 @@ namespace LiteOptions.UI
                 ? "Apply in every app, and to the laptop's own keyboard too. The K380's Easy-Switch keys and Fn work inside the keyboard and can't be changed."
                 : "Used only while " + current.App + " is in front, on top of the All applications list. Choose \"Leave the key as it is\" to switch a global remap off here.";
             RefreshKeyList();
+            UpdateDeviceSections();
             ResumeLayout();
             loading = false;
         }
@@ -366,7 +374,8 @@ namespace LiteOptions.UI
             speedSlider = new Slider { Minimum = 1, Maximum = 20, Width = Theme.S(220) };
             speedValue = ValueLabel(Theme.S(86));
             speedSlider.ValueChanged += (s, e) => { speedValue.Text = speedSlider.Value.ToString(); SafeWin(() => SystemTweaks.SetPointerSpeed(speedSlider.Value)); };
-            pointerCard.Add(new SettingRow(Theme.IcTouch, "Windows pointer speed", "Also changes the touchpad. Windows' default is 10.", UIx.Row(speedSlider, speedValue, Spacer())));
+            pointerCard.Add(new SettingRow(Theme.IcTouch, "Windows pointer speed", "Also changes the touchpad. Windows' default is 10.",
+                UIx.Row(speedSlider, speedValue, new FluentButton("", ButtonKind.Subtle, Theme.IcRefresh, (s, e) => speedSlider.Value = 10))));
 
             precision = new ToggleSwitch();
             precision.CheckedChanged += (s, e) => { if (!loading) SafeWin(() => SystemTweaks.SetPrecision(precision.Checked)); };
@@ -378,11 +387,79 @@ namespace LiteOptions.UI
             linesSlider = new Slider { Minimum = 1, Maximum = 20, Width = Theme.S(220) };
             linesValue = ValueLabel(Theme.S(86));
             linesSlider.ValueChanged += (s, e) => { linesValue.Text = linesSlider.Value + (linesSlider.Value == 1 ? " line" : " lines"); SafeWin(() => SystemTweaks.SetWheelLines(linesSlider.Value)); };
-            scrollCard.Add(new SettingRow(null, "Scroll distance", "Lines moved by one click of the wheel. Windows' default is 3.", UIx.Row(linesSlider, linesValue, Spacer())));
+            scrollCard.Add(new SettingRow(null, "Scroll distance", "Lines moved by one click of the wheel. Windows' default is 3.",
+                UIx.Row(linesSlider, linesValue, new FluentButton("", ButtonKind.Subtle, Theme.IcRefresh, (s, e) => linesSlider.Value = 3))));
+            smooth = new ToggleSwitch();
+            smooth.CheckedChanged += (s, e) => { if (!loading) { app.Settings.SmoothScroll = smooth.Checked; app.Commit(); } };
+            scrollCard.Add(new SettingRow(null, "Smooth scrolling", "Each click of the wheel glides instead of jumping. Works in browsers, Office and most apps; if an older app stops scrolling, switch this off.", smooth));
             reverse = new ToggleSwitch();
             reverse.CheckedChanged += (s, e) => { if (!loading) BeginInvoke((Action)ToggleReverse); };
             scrollCard.Add(new SettingRow(null, "Reverse scroll direction", "This mouse only. Windows asks for permission once; then switch the mouse off and on.", reverse));
             Add(pageMouse, scrollCard);
+
+            mouseHostsHeader = Add(pageMouse, UIx.Section("Easy-Switch"));
+            mouseHostsCard = new CardPanel();
+            mouseHostRows = HostRows(mouseHostsCard, "The button underneath the mouse changes channel.");
+            Add(pageMouse, mouseHostsCard);
+        }
+
+        /// <summary>Three rows for the Easy-Switch channels and a note on how to switch.</summary>
+        static SettingRow[] HostRows(CardPanel card, string note)
+        {
+            var rows = new SettingRow[3];
+            for (int i = 0; i < 3; i++) rows[i] = card.Add(new SettingRow(Theme.IcSync, "Channel " + (i + 1), "", null));
+            card.Add(new NoteRow(note));
+            return rows;
+        }
+
+        void FillHosts(Control header, CardPanel card, SettingRow[] rows, LogiDevice d, bool mouse)
+        {
+            var h = d?.Hosts;
+            bool show = h != null && h.Hosts.Count > 0 && (current == null || current.IsGlobal);
+            header.Visible = card.Visible = show;
+            if (!show) return;
+            for (int i = 0; i < rows.Length; i++)
+            {
+                var info = h.Hosts.FirstOrDefault(x => x.Index == i);
+                rows[i].Visible = info != null;
+                if (info == null) continue;
+                bool here = i == h.Current;
+                string name = info.Name ?? "";
+                rows[i].Title.Text = (i + 1) + "   " + (name.Length > 0 ? name : here ? "This computer" : info.Unknown ? "Channel " + (i + 1) : info.Paired ? "Paired device" : "Nothing paired");
+                rows[i].Description = here ? "This computer"
+                    : info.Unknown ? "This device doesn't say what's paired here"
+                    : !info.Paired ? (mouse ? "Hold the button underneath to pair" : "Hold F" + (i + 1) + " to pair")
+                    : "Paired over Bluetooth";
+            }
+        }
+
+        /// <summary>Easy-Switch and "turn off keys" follow the devices and the profile shown (they belong to All applications).</summary>
+        void UpdateDeviceSections()
+        {
+            var m = app.Devices.Mouse;
+            var k = app.Devices.Keyboard;
+            FillHosts(mouseHostsHeader, mouseHostsCard, mouseHostRows, m, true);
+            FillHosts(kbHostsHeader, kbHostsCard, kbHostRows, k, false);
+            int caps = k?.DisableCaps ?? 0;
+            bool showOff = caps != 0 && (current == null || current.IsGlobal);
+            keysOffHeader.Visible = keysOffCard.Visible = showOff;
+            int shown = app.Settings.DisabledKeys >= 0 ? app.Settings.DisabledKeys & caps : Math.Max(0, k?.DisabledKeys ?? 0);
+            foreach (var o in offRows)
+            {
+                o.row.Visible = (caps & o.bit) != 0;
+                o.sw.Checked = (shown & o.bit) != 0;
+            }
+            if (smooth != null) smooth.Checked = app.Settings.SmoothScroll;
+        }
+
+        void SetKeyOff(int bit, bool off)
+        {
+            var k = app.Devices.Keyboard;
+            int mask = app.Settings.DisabledKeys >= 0 ? app.Settings.DisabledKeys : Math.Max(0, k?.DisabledKeys ?? 0);
+            mask = off ? mask | bit : mask & ~bit;
+            app.Settings.DisabledKeys = mask;
+            app.Commit();
+            app.Devices.ApplySettingsNow();
         }
 
         static Label ValueLabel(int width)
@@ -395,7 +472,6 @@ namespace LiteOptions.UI
             return l;
         }
 
-        static Control Spacer() => new Panel { Size = new Size(Theme.S(34), Theme.S(32)), Margin = Padding.Empty, BackColor = Color.Transparent };
 
         ActionPicker Picker(string defaultLabel, Action<ActionSpec> setter, bool allowNothing = true)
         {
@@ -492,6 +568,18 @@ namespace LiteOptions.UI
             Add(pageKeys, fnCard);
             appNoteKeys = Add(pageKeys, NoteCard("The top-row setting is shared by every app. Switch to All applications to change it."));
 
+            keysOffHeader = Add(pageKeys, UIx.Section("Turn off keys"));
+            keysOffCard = new CardPanel();
+            foreach (var (bit, name) in new[] { (0x01, "Caps Lock"), (0x08, "Insert"), (0x10, "Windows key"), (0x04, "Scroll Lock"), (0x02, "Num Lock") })
+            {
+                var sw = new ToggleSwitch();
+                int b = bit;
+                sw.CheckedChanged += (s, e) => { if (!loading) SetKeyOff(b, sw.Checked); };
+                offRows.Add((bit, keysOffCard.Add(new SettingRow(Theme.IcKeyboard, "Turn off " + name, null, sw)), sw));
+            }
+            keysOffCard.Add(new NoteRow("Switched off inside the keyboard, so it applies everywhere. The laptop's own keys keep working."));
+            Add(pageKeys, keysOffCard);
+
             Add(pageKeys, UIx.Section("Key remapping"));
             var card = remapCard = new CardPanel();
             rowRemap = card.Add(new SettingRow(Theme.IcEdit, "Remapped keys", "", new FluentButton("Add key", ButtonKind.Primary, Theme.IcAdd, (s, e) => AddKey())));
@@ -500,6 +588,11 @@ namespace LiteOptions.UI
             remapList.Delete += b => { current.Keys.Remove(b); app.Commit(); RefreshKeyList(); };
             card.Add(new NoteRow("Tip: to change a K380 media key, click Add key and press it exactly as you normally would."));
             Add(pageKeys, card);
+
+            kbHostsHeader = Add(pageKeys, UIx.Section("Easy-Switch"));
+            kbHostsCard = new CardPanel();
+            kbHostRows = HostRows(kbHostsCard, "The F1, F2 and F3 keys change channel.");
+            Add(pageKeys, kbHostsCard);
         }
 
         void RefreshKeyList()
@@ -573,6 +666,9 @@ namespace LiteOptions.UI
                 if (popups.Checked) Osd.Show(Theme.IcCheck, "Pop-ups on", "Shown when you switch the top row, change DPI or use a gesture");
             };
             gen.Add(new SettingRow(Theme.IcInfo, "On-screen pop-ups", "A small note at the bottom of the screen when you switch the top row, change DPI or use a gesture", popups));
+            lockPopups = new ToggleSwitch();
+            lockPopups.CheckedChanged += (s, e) => { if (!loading) { app.Settings.LockKeyPopups = lockPopups.Checked; app.Commit(); } };
+            gen.Add(new SettingRow(null, "Caps Lock and Num Lock pop-ups", "Show a pop-up when Caps Lock, Num Lock or Scroll Lock is switched on or off", lockPopups));
             gen.Add(new SettingRow(Theme.IcSettings, "Setup", "Go through the three first-run choices again",
                 new FluentButton("Run setup", ButtonKind.Standard, null, (s, e) =>
                 {
@@ -639,6 +735,7 @@ namespace LiteOptions.UI
             paused.Checked = app.Settings.Paused;
             notify.Checked = app.Settings.Notifications;
             popups.Checked = app.Settings.ShowPopups;
+            lockPopups.Checked = app.Settings.LockKeyPopups;
             lowBatt.Enabled = app.Settings.Notifications;
             int lv = new[] { 10, 15, 20, 25, 30 }.OrderBy(v => Math.Abs(v - app.Settings.LowBatteryPercent)).First();
             lowBatt.Select(lv);
@@ -712,6 +809,7 @@ namespace LiteOptions.UI
             fnNote.Text2 = state + (sc != null ? " Press " + KeyNames.Combo(sc.Mods, sc.Vk) + " any time to switch." : "");
             fnNote.Parent?.PerformLayout();
 
+            UpdateDeviceSections();
             sideStatus.Invalidate();
             loading = false;
             if (pageSettings.Visible) RefreshSettingsPage();

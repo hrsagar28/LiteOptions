@@ -743,9 +743,6 @@ namespace LiteOptions.SettingsApp
                     Ui.Button("Re-scan", Glyph.Refresh, false, async (s, e) => { await store.Send("rescan"); }),
                     diagToggle))), "diagnostics log troubleshooting rescan");
             Add(diag);
-            var classic = new HyperlinkButton { Content = "Open the classic settings window instead", Margin = new Thickness(0, 6, 0, 0) };
-            classic.Click += (s, e) => _ = store.Send("classic");
-            Add(classic);
         }
 
         async System.Threading.Tasks.Task<string> Diagnostics()

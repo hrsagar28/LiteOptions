@@ -149,6 +149,16 @@ jobs:
           if ($w) { $w.CloseMainWindow() | Out-Null; Start-Sleep 3 }
           Say "after closing the window: window $(Mem (Get-Process LiteOptions.Settings -ErrorAction SilentlyContinue)); engine $(Mem (Get-Process LiteOptions -ErrorAction SilentlyContinue))"
 
+          # the classic window: what opens if the new window ever can't start
+          Start-Process (Join-Path $dir 'LiteOptions.exe') -ArgumentList '--classic'
+          Start-Sleep 5
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save((Join-Path $r 'classic.png'))
+          $g.Dispose(); $bmp.Dispose()
+          Say "classic window: $(if (Get-Content (Join-Path $cfg 'log.txt') -ErrorAction SilentlyContinue | Select-String 'UI error' -Quiet) { 'error logged' } else { 'opened' })"
+
           # the tray panel, as a click on the tray icon opens it (its log line says how long it took to appear)
           $p = Start-Process $ui -ArgumentList '--tray' -PassThru
           Start-Sleep 5
@@ -224,6 +234,8 @@ jobs:
 
             Fixed in 2.2.4:
             - Switching Windows between light and dark while LiteOptions is open now recolours everything straight away (no need to close and reopen it).
+            - The settings window opens faster (its code now ships precompiled).
+            - The classic window, which opens only if the new one can't start, has caught up: smooth scrolling, Easy-Switch, turn off keys, Caps Lock pop-ups and reset buttons. The link to it is gone from Settings.
 
             Fixed in 2.2.3:
             - Every page lines up: the page title, the All apps button and the settings below share one column, centred beside the menu with equal space on both sides.

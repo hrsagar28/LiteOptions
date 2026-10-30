@@ -29,6 +29,8 @@
     <WinAppSdkVersion>2.6.4</WinAppSdkVersion>
     <!-- drop the unused parts of .NET and of the Windows API wrappers; our own code is kept whole -->
     <PublishTrimmed>true</PublishTrimmed>
+    <!-- precompiled code, so the window and the tray panel open sooner (less work for the JIT at start) -->
+    <PublishReadyToRun>true</PublishReadyToRun>
     <TrimMode>partial</TrimMode>
     <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
     <InvariantGlobalization>false</InvariantGlobalization>
