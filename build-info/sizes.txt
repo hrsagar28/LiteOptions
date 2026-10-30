@@ -1,0 +1,6 @@
+LiteOptions-ARM64.exe            42.5 MB
+LiteOptions-x64.exe              43.4 MB
+settings-ARM64.zip               42.1 MB
+settings-x64.zip                 43.0 MB
+settings-x64 (unpacked)         103.5 MB, 319 files
+settings-ARM64 (unpacked)       115.1 MB, 319 files

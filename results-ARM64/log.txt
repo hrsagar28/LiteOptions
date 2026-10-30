@@ -1,0 +1,9 @@
+2026-10-30 06:08:40  LiteOptions 2.3.3 starting (Arm64)
+2026-10-30 06:08:54  Tray panel shown 5496 ms after start
+2026-10-30 06:08:57  Settings window: Dark theme, 22 of 22 colours updated
+2026-10-30 06:08:58  Settings window: Light theme, 22 of 22 colours updated
+2026-10-30 06:09:22  Tray panel shown 346 ms after start
+2026-10-30 06:09:43  Tray panel shown 15646 ms after start
+2026-10-30 06:10:06  Settings window: Dark theme, 23 of 23 colours updated
+2026-10-30 06:10:09  Settings window: Light theme, 23 of 23 colours updated
+2026-10-30 06:10:29  Tray panel shown 15665 ms after start

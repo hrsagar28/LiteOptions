@@ -1,0 +1,10 @@
+window created (Arm64, .NET 10.0.14, Microsoft Windows NT 10.0.26200.0)
+hello: engine 2.3.3 Arm64, 1 profile(s), 0 device(s)
+diagnostics: 178 characters
+settings round trip: identical
+pages: mouse, keyboard, app profiles, pop-ups & alerts, settings shown
+search: finds and opens settings on other pages
+tray panel: 414 px tall, hides again
+menu: folds behind the menu button when narrow, back on the left when wide
+theme switch: colours follow light and dark (text #E4000000 -> #FFFFFFFF -> #E4000000, picture background #FFEEEEEE -> #FF1C1C1C)
+PASS: the settings window works with this engine

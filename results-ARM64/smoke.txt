@@ -1,0 +1,22 @@
+Windows 10.0.26200.0 on ARM64
+installer: 42.5 MB
+install exit code: 0
+installed size: 157.7 MB
+engine idle: 25.5 MB private, 41.9 MB working set
+self-test exit code: 0
+  window created (Arm64, .NET 10.0.14, Microsoft Windows NT 10.0.26200.0)
+  hello: engine 2.3.3 Arm64, 1 profile(s), 0 device(s)
+  diagnostics: 178 characters
+  settings round trip: identical
+  pages: mouse, keyboard, app profiles, pop-ups & alerts, settings shown
+  search: finds and opens settings on other pages
+  tray panel: 414 px tall, hides again
+  menu: folds behind the menu button when narrow, back on the left when wide
+  theme switch: colours follow light and dark (text #E4000000 -> #FFFFFFFF -> #E4000000, picture background #FFEEEEEE -> #FF1C1C1C)
+  PASS: the settings window works with this engine
+window opened by the engine: 60.1 MB private, 139.0 MB working set
+after closing the window: window not running; engine 27.6 MB private, 40.9 MB working set
+classic window: opened
+tray panel process: running
+screenshots taken: 116
+uninstall exit code: 0; folder removed: True; processes left: 0
