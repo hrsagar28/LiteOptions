@@ -213,8 +213,9 @@ namespace LiteOptions.UI
         }
 
         /// <summary>
-        /// The pop-up on one monitor with Windows' own acrylic behind it (the "transient window" material of its flyouts):
-        /// rounded corners, border and blur come from Windows; we draw only the icon and text, with per-pixel alpha.
+        /// The pop-up on one monitor with Windows' acrylic blur behind it (the accent blur, which unlike DWM's backdrop
+        /// stays on although the pop-up never takes focus): rounded corners, border and blur come from Windows;
+        /// we draw only the icon and text, with per-pixel alpha.
         /// It slides up a little as it appears and down as it goes, like the volume pop-up.
         /// </summary>
         sealed class AcrylicPopup : NativeWindow, IPopup
@@ -236,10 +237,9 @@ namespace LiteOptions.UI
                     Style = Native.WS_POPUP,
                     ExStyle = Native.WS_EX_TOOLWINDOW | Native.WS_EX_NOACTIVATE | Native.WS_EX_TOPMOST,
                 });
-                int backdrop = Native.DWMSBT_TRANSIENTWINDOW, round = Native.DWMWCP_ROUND;
-                int hr = Native.DwmSetWindowAttribute(Handle, Native.DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, 4);
-                if (hr != 0) { DestroyHandle(); throw new InvalidOperationException("backdrop refused (0x" + hr.ToString("X8") + ")"); }
+                int round = Native.DWMWCP_ROUND;
                 Native.DwmSetWindowAttribute(Handle, Native.DWMWA_WINDOW_CORNER_PREFERENCE, ref round, 4);
+                if (!Tint()) { DestroyHandle(); throw new InvalidOperationException("acrylic refused"); }
                 var m = new Native.MARGINS { Left = -1, Right = -1, Top = -1, Bottom = -1 };
                 Native.DwmExtendFrameIntoClientArea(Handle, ref m);
             }
@@ -250,13 +250,17 @@ namespace LiteOptions.UI
                 int dpi = Native.DpiAt(new Point(b.Left + b.Width / 2, b.Top + b.Height / 2), Theme.SystemDpi);
                 k = dpi / 96f;
                 int dark = Theme.Dark ? 1 : 0;
-                Native.DwmSetWindowAttribute(Handle, Native.DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, 4); // tints the acrylic
+                Native.DwmSetWindowAttribute(Handle, Native.DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, 4); // border colour
+                Tint();
                 SetFrame(Render(k, glyph, title, subtitle, progress, Theme.Dark, badge, light, glass: true));
                 var wa = screen.WorkingArea;
                 // the bottom edge sits where Windows' own volume pop-up sits: 14 px above the taskbar
                 pos = new Native.POINT { X = wa.Left + (wa.Width - size.cx) / 2, Y = wa.Bottom - (int)Math.Round(14 * k) - size.cy };
                 if (shown) Native.InvalidateRect(Handle, IntPtr.Zero, false);
             }
+
+            /// <summary>Windows' flyout tint: near-white or near-black, mostly opaque, the blur showing through.</summary>
+            bool Tint() => Native.SetAcrylic(Handle, Theme.Dark ? Color.FromArgb(0xC8, 0x2C, 0x2C, 0x2C) : Color.FromArgb(0xC8, 0xF3, 0xF3, 0xF3));
 
             public string Describe() => $"{size.cx}x{size.cy} acrylic at {pos.X},{pos.Y} on {screen.Bounds.Width}x{screen.Bounds.Height}{(screen.Primary ? " (main)" : "")}";
 

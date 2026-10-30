@@ -275,6 +275,31 @@ namespace LiteOptions
         [DllImport("gdi32.dll")] public static extern bool BitBlt(IntPtr dst, int x, int y, int w, int h, IntPtr src, int sx, int sy, uint rop);
         public const int WM_PAINT = 0x000F, WM_ERASEBKGND = 0x0014, WM_MOUSEACTIVATE = 0x0021, WM_NCHITTEST = 0x0084;
 
+        // the "accent" blur: acrylic that shows whether or not the window is active (DWM's own backdrop goes flat grey
+        // on a window that never takes focus, which a pop-up must not)
+        [DllImport("user32.dll")] static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WINDOWCOMPOSITIONATTRIBDATA data);
+        [StructLayout(LayoutKind.Sequential)] struct WINDOWCOMPOSITIONATTRIBDATA { public int Attrib; public IntPtr Data; public int Size; }
+        [StructLayout(LayoutKind.Sequential)] struct ACCENT_POLICY { public int AccentState, AccentFlags; public uint GradientColor; public int AnimationId; }
+
+        /// <summary>Acrylic blur behind the window, tinted with an ARGB colour. False if Windows refuses.</summary>
+        public static bool SetAcrylic(IntPtr hwnd, System.Drawing.Color tint)
+        {
+            var accent = new ACCENT_POLICY
+            {
+                AccentState = 4, // ACCENT_ENABLE_ACRYLICBLURBEHIND
+                GradientColor = (uint)(tint.A << 24 | tint.B << 16 | tint.G << 8 | tint.R),
+            };
+            int size = Marshal.SizeOf(accent);
+            IntPtr p = Marshal.AllocHGlobal(size);
+            try
+            {
+                Marshal.StructureToPtr(accent, p, false);
+                var data = new WINDOWCOMPOSITIONATTRIBDATA { Attrib = 19 /* WCA_ACCENT_POLICY */, Data = p, Size = size };
+                return SetWindowCompositionAttribute(hwnd, ref data) != 0;
+            }
+            finally { Marshal.FreeHGlobal(p); }
+        }
+
         /// <summary>Windows build number (22621 = Windows 11 22H2), or 0 if unknown.</summary>
         public static int WindowsBuild
         {

@@ -232,6 +232,9 @@ jobs:
 
             Double-click it to install or update (your settings are kept). Windows may say "Windows protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
 
+            Fixed in 2.3.1:
+            - The acrylic behind pop-ups now shows (2.3.0 showed Windows' flat grey stand-in, because a pop-up never takes focus).
+
             New in 2.3:
             - Pop-ups use Windows 11's own acrylic (the frosted glass of its volume pop-up), with its rounded corners and border, and slide up as they appear. Windows 10 keeps the drawn look.
 
