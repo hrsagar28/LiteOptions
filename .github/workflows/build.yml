@@ -233,6 +233,7 @@ jobs:
             Double-click it to install or update (your settings are kept). Windows may say "Windows protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
 
             Fixed in 2.3.3:
+            - Pop-ups are more see-through: the colours of the wallpaper and windows behind show through the frosted glass.
             - Windows SmartScreen no longer asks every time LiteOptions starts, only once when you run a newly downloaded installer. (The installed copy kept the installer's "downloaded from the internet" mark.)
 
             Fixed in 2.3.2:
