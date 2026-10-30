@@ -19,7 +19,29 @@ namespace LiteOptions.UI
     {
         public static bool Enabled = true;
 
-        static readonly List<Popup> windows = new List<Popup>();
+        static readonly List<IPopup> windows = new List<IPopup>();
+
+        interface IPopup : IDisposable
+        {
+            void SetContent(string glyph, string title, string subtitle, double? progress, Badge badge, bool? light);
+            string Describe();
+            string Present(int alpha);
+            string Fade(int alpha);
+        }
+
+        /// <summary>Windows 11 22H2 and later can put its own acrylic behind a window, as its volume pop-up has.</summary>
+        static readonly bool acrylicOk = Native.IsWindows && Native.WindowsBuild >= 22621;
+        static bool acrylicFailed;
+
+        static IPopup NewPopup(Screen sc)
+        {
+            if (acrylicOk && !acrylicFailed)
+            {
+                try { return new AcrylicPopup(sc); }
+                catch (Exception ex) { acrylicFailed = true; Logger.Write("acrylic pop-up unavailable, using the drawn one: " + ex.Message); }
+            }
+            return new Popup(sc);
+        }
         static Timer timer;
         static int alpha;
         static int phase; // 0 hidden, 1 fading in, 2 holding, 3 fading out
@@ -51,7 +73,7 @@ namespace LiteOptions.UI
             if (phase == 0 || windows.Count != screens.Length)
             {
                 CloseAll();
-                foreach (var sc in screens) windows.Add(new Popup(sc));
+                foreach (var sc in screens) windows.Add(NewPopup(sc));
             }
             var notes = new List<string>();
             foreach (var w in windows)
@@ -108,7 +130,7 @@ namespace LiteOptions.UI
         }
 
         /// <summary>The pop-up window on one monitor.</summary>
-        sealed class Popup : NativeWindow, IDisposable
+        sealed class Popup : NativeWindow, IPopup
         {
             readonly Screen screen;
             Bitmap frame;
@@ -190,14 +212,122 @@ namespace LiteOptions.UI
             }
         }
 
+        /// <summary>
+        /// The pop-up on one monitor with Windows' own acrylic behind it (the "transient window" material of its flyouts):
+        /// rounded corners, border and blur come from Windows; we draw only the icon and text, with per-pixel alpha.
+        /// It slides up a little as it appears and down as it goes, like the volume pop-up.
+        /// </summary>
+        sealed class AcrylicPopup : NativeWindow, IPopup
+        {
+            readonly Screen screen;
+            Bitmap frame;
+            IntPtr hBitmap, memDc;
+            Native.POINT pos;
+            Native.SIZE size;
+            float k = 1;
+            bool shown;
+
+            public AcrylicPopup(Screen screen)
+            {
+                this.screen = screen;
+                CreateHandle(new CreateParams
+                {
+                    Caption = "LiteOptions pop-up",
+                    Style = Native.WS_POPUP,
+                    ExStyle = Native.WS_EX_TOOLWINDOW | Native.WS_EX_NOACTIVATE | Native.WS_EX_TOPMOST,
+                });
+                int backdrop = Native.DWMSBT_TRANSIENTWINDOW, round = Native.DWMWCP_ROUND;
+                int hr = Native.DwmSetWindowAttribute(Handle, Native.DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, 4);
+                if (hr != 0) { DestroyHandle(); throw new InvalidOperationException("backdrop refused (0x" + hr.ToString("X8") + ")"); }
+                Native.DwmSetWindowAttribute(Handle, Native.DWMWA_WINDOW_CORNER_PREFERENCE, ref round, 4);
+                var m = new Native.MARGINS { Left = -1, Right = -1, Top = -1, Bottom = -1 };
+                Native.DwmExtendFrameIntoClientArea(Handle, ref m);
+            }
+
+            public void SetContent(string glyph, string title, string subtitle, double? progress, Badge badge, bool? light)
+            {
+                var b = screen.Bounds;
+                int dpi = Native.DpiAt(new Point(b.Left + b.Width / 2, b.Top + b.Height / 2), Theme.SystemDpi);
+                k = dpi / 96f;
+                int dark = Theme.Dark ? 1 : 0;
+                Native.DwmSetWindowAttribute(Handle, Native.DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, 4); // tints the acrylic
+                SetFrame(Render(k, glyph, title, subtitle, progress, Theme.Dark, badge, light, glass: true));
+                var wa = screen.WorkingArea;
+                // the bottom edge sits where Windows' own volume pop-up sits: 14 px above the taskbar
+                pos = new Native.POINT { X = wa.Left + (wa.Width - size.cx) / 2, Y = wa.Bottom - (int)Math.Round(14 * k) - size.cy };
+                if (shown) Native.InvalidateRect(Handle, IntPtr.Zero, false);
+            }
+
+            public string Describe() => $"{size.cx}x{size.cy} acrylic at {pos.X},{pos.Y} on {screen.Bounds.Width}x{screen.Bounds.Height}{(screen.Primary ? " (main)" : "")}";
+
+            public string Present(int a) => Fade(a);
+
+            /// <summary>"Fading" here is sliding: fully in at 255, 16 px lower at 0 (eased), then hidden by the caller.</summary>
+            public string Fade(int a)
+            {
+                double t = 1 - Math.Max(0, Math.Min(255, a)) / 255.0;
+                int offset = (int)Math.Round(16 * k * t * t);
+                uint flags = Native.SWP_NOACTIVATE | (shown ? 0 : Native.SWP_SHOWWINDOW);
+                if (!Native.SetWindowPos(Handle, Native.HWND_TOPMOST, pos.X, pos.Y + offset, size.cx, size.cy, flags)) return "SetWindowPos failed";
+                if (!shown) { shown = true; Native.InvalidateRect(Handle, IntPtr.Zero, false); }
+                return null;
+            }
+
+            protected override void WndProc(ref Message m)
+            {
+                switch (m.Msg)
+                {
+                    case Native.WM_PAINT:
+                        var hdc = Native.BeginPaint(Handle, out var ps);
+                        if (memDc != IntPtr.Zero) Native.BitBlt(hdc, 0, 0, size.cx, size.cy, memDc, 0, 0, 0x00CC0020 /* SRCCOPY */);
+                        Native.EndPaint(Handle, ref ps);
+                        return;
+                    case Native.WM_ERASEBKGND:
+                        m.Result = (IntPtr)1; // the backdrop is the background
+                        return;
+                    case Native.WM_MOUSEACTIVATE:
+                        m.Result = (IntPtr)3; // MA_NOACTIVATE: never take focus
+                        return;
+                }
+                base.WndProc(ref m);
+            }
+
+            void SetFrame(Bitmap bmp)
+            {
+                FreeFrame();
+                frame = bmp;
+                size = new Native.SIZE { cx = bmp.Width, cy = bmp.Height };
+                IntPtr screenDc = Native.GetDC(IntPtr.Zero);
+                memDc = Native.CreateCompatibleDC(screenDc);
+                Native.ReleaseDC(IntPtr.Zero, screenDc);
+                hBitmap = bmp.GetHbitmap(Color.FromArgb(0)); // premultiplied 32-bit: transparent where there's no icon or text
+                Native.SelectObject(memDc, hBitmap);
+            }
+
+            void FreeFrame()
+            {
+                if (memDc != IntPtr.Zero) { Native.DeleteDC(memDc); memDc = IntPtr.Zero; }
+                if (hBitmap != IntPtr.Zero) { Native.DeleteObject(hBitmap); hBitmap = IntPtr.Zero; }
+                frame?.Dispose(); frame = null;
+            }
+
+            public void Dispose()
+            {
+                FreeFrame();
+                try { Native.ShowWindow(Handle, Native.SW_HIDE); } catch { }
+                DestroyHandle();
+            }
+        }
+
         const float ShadowSize = 14;
 
         /// <summary>
         /// Draws the pop-up in the size and style of Windows 11's own volume and brightness pop-ups (public so tests can render it).
         /// Two layouts: icon + title (+ subtitle), or icon + bar + value when there's a level to show.
         /// </summary>
+        /// <param name="glass">Only the icon and text, on transparent: for the acrylic pop-up, where Windows draws the card.</param>
         public static Bitmap Render(float k, string glyph, string title, string subtitle, double? progress, bool dark,
-                                    Badge badge = Badge.None, bool? light = null)
+                                    Badge badge = Badge.None, bool? light = null, bool glass = false)
         {
             Color bg = dark ? Color.FromArgb(250, 44, 44, 44) : Color.FromArgb(252, 249, 249, 249);
             Color border = dark ? Color.FromArgb(255, 66, 66, 66) : Color.FromArgb(255, 222, 222, 222);
@@ -218,7 +348,7 @@ namespace LiteOptions.UI
                 mg.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
                 float tw = mg.MeasureString(title ?? "", bar ? valueFont : titleFont).Width;
                 float sw = string.IsNullOrEmpty(subtitle) || bar ? 0 : mg.MeasureString(subtitle, subFont).Width;
-                float pad = 16 * k, gap = 12 * k, shadow = ShadowSize * k;
+                float pad = 16 * k, gap = 12 * k, shadow = glass ? 0 : ShadowSize * k;
                 float iconBox = (badge == Badge.None ? 20 : 28) * k;
                 float lightW = light != null && !bar ? gap + 8 * k : 0;
                 float minW = 192 * k; // the width of Windows' volume pop-up
@@ -233,18 +363,19 @@ namespace LiteOptions.UI
                     g.Clear(Color.Transparent);
                     var box = new RectangleF(shadow, shadow * 0.7f, w, h);
                     // soft shadow: a few expanding translucent outlines
-                    for (int i = 6; i >= 1; i--)
+                    for (int i = glass ? 0 : 6; i >= 1; i--)
                     {
                         var r = RectangleF.Inflate(box, i * 1.4f * k, i * 1.4f * k);
                         r.Offset(0, 3 * k);
                         using (var p = Theme.Rounded(r, 8 * k + i * 1.4f * k))
                         using (var b = new SolidBrush(Color.FromArgb(dark ? 16 : 8, 0, 0, 0))) g.FillPath(b, p);
                     }
-                    using (var p = Theme.Rounded(box, 8 * k))
-                    {
-                        using (var b = new SolidBrush(bg)) g.FillPath(b, p);
-                        using (var pen = new Pen(border, Math.Max(1f, k))) g.DrawPath(pen, p);
-                    }
+                    if (!glass)
+                        using (var p = Theme.Rounded(box, 8 * k))
+                        {
+                            using (var b = new SolidBrush(bg)) g.FillPath(b, p);
+                            using (var pen = new Pen(border, Math.Max(1f, k))) g.DrawPath(pen, p);
+                        }
 
                     // the icon, in its box on the left
                     var ib = new RectangleF(box.X + pad, box.Y + (h - iconBox) / 2, iconBox, iconBox);
