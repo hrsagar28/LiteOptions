@@ -90,6 +90,13 @@ namespace LiteOptions.UI
             aulaDirRow = aulaLightCard.Add(new SettingRow(null, "Direction", "", aulaDir));
             Add(pageAula, aulaLightCard);
 
+            Add(pageAula, UIx.Section("Side lights and light bar (set on the keyboard only)"));
+            var fn = new CardPanel();
+            fn.Add(new SettingRow(Theme.IcBrightness, "Light bar above the arrow keys", "Effect Fn + Left Shift · Speed Fn + Left Ctrl · Brightness Fn + Left Alt · Colour Fn + Z", null));
+            fn.Add(new SettingRow(Theme.IcBrightness, "Side lights", "Effect Fn + Right Shift · Speed Fn + Right Ctrl · Brightness Fn + Right Alt · Colour Fn + /", null));
+            fn.Add(new NoteRow("The keyboard ignores these settings from any app, Aula's included. It keeps whatever you set with the Fn keys."));
+            Add(pageAula, fn);
+
             Add(pageAula, UIx.Section("Screen clock"));
             var clock = new CardPanel();
             aulaSync = new ToggleSwitch();

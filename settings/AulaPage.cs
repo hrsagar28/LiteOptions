@@ -101,6 +101,15 @@ namespace LiteOptions.SettingsApp
             dirCard = lightGroup.Add(new SettingCard(Glyph.Swap, "Direction", "", new Grid { Children = { dirLR, dirUD } }));
 
             // ── clock ──
+            // ── side lights and light bar: the keyboard only takes these from its own Fn shortcuts ──
+            Section("Side lights and light bar", Note("Set on the keyboard only"));
+            var fnGroup = Group();
+            Find(fnGroup.Add(new SettingCard(Glyph.Light, "Light bar above the arrow keys",
+                "Effect: Fn + Left Shift  ·  Speed: Fn + Left Ctrl  ·  Brightness: Fn + Left Alt  ·  Colour: Fn + Z")), "aula light bar strip arrow keys fn shortcut");
+            Find(fnGroup.Add(new SettingCard(Glyph.Light, "Side lights",
+                "Effect: Fn + Right Shift  ·  Speed: Fn + Right Ctrl  ·  Brightness: Fn + Right Alt  ·  Colour: Fn + /")), "aula side lights sidelight fn shortcut");
+            fnGroup.Add(new SettingCard(Glyph.Info, "Why not here?", "The keyboard ignores these settings from any app, Aula's included. It keeps whatever you set with the Fn keys."));
+
             Section("Screen clock");
             clockGroup = Group();
             sync = Ui.Toggle();
