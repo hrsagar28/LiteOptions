@@ -133,7 +133,7 @@ namespace LiteOptions.SettingsApp
                 HasBattery = true, BatteryPercent = -1, BatteryLevel = "Good", FnSupported = true, FnMedia = 0, DisableCaps = 0x1D, DisabledKeys = 0x10,
                 CurrentHost = 1, Hosts = new List<HostDto> { new HostDto { Number = 1 }, new HostDto { Number = 2, Paired = true, Name = "WORK-LAPTOP" }, new HostDto { Number = 3, Paired = true, Name = "iPhone" } } },
             new DeviceDto { Key = "aula", Name = "Aula F108 Pro", Kind = "Aula", Connection = "USB cable", Pid = 0x800A, Online = true, Firmware = "v0120",
-                CanConfigure = true, ClockSynced = "today at 16:05" },
+                CanConfigure = true, ClockSynced = "today at 16:05", HasBattery = true, BatteryPercent = 64 },
         };
         readonly SystemDto system = new SystemDto { Version = "2.4.1", Installed = true, PointerSpeed = 10, Precision = true, WheelLines = 3, Startup = true, ReverseScroll = 0, Architecture = RuntimeInformation.ProcessArchitecture.ToString() };
 

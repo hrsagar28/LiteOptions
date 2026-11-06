@@ -208,7 +208,7 @@ namespace LiteOptions.SettingsApp
         }
 
         /// <summary>A device: its photo in a battery ring, its name, and one line about it. Clicking it opens its page.</summary>
-        FrameworkElement DeviceTile(DeviceDto d, bool mouse, string detail, string page = null)
+        FrameworkElement DeviceTile(DeviceDto d, bool mouse, string detail)
         {
             var stack = new StackPanel { Spacing = 4, HorizontalAlignment = HorizontalAlignment.Center };
             var ring = Ring.Device(d, mouse, 64, store.IsLow(d));
@@ -227,7 +227,32 @@ namespace LiteOptions.SettingsApp
             };
             ToolTipService.SetToolTip(b, name);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(b, name + ", " + detail);
-            b.Click += (s, e) => openMain(page ?? (mouse ? "mouse" : "keys"));
+            b.Click += (s, e) => openMain(mouse ? "mouse" : "keys");
+            return b;
+        }
+
+        /// <summary>A device on one line: small battery ring, name, and battery and connection. Opens its page.</summary>
+        FrameworkElement DeviceRow(DeviceDto d)
+        {
+            var ring = Ring.Device(d, false, 40, store.IsLow(d));
+            var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            texts.Children.Add(new TextBlock { Text = d.Name, Style = Ui.Style("BodyStrongTextBlockStyle"), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap });
+            string detail = (d.HasBattery ? d.BatteryText + " · " : "") + d.Connection switch { "USB cable" => "USB cable", "Bluetooth" => "Bluetooth", _ => "Dongle" };
+            texts.Children.Add(new TextBlock { Text = detail, Style = Ui.Style("Secondary"), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap });
+            var g = new Grid { ColumnSpacing = 12 };
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            Grid.SetColumn(texts, 1);
+            g.Children.Add(ring);
+            g.Children.Add(texts);
+            var b = new Button
+            {
+                Content = g, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                Padding = new Thickness(12, 8, 12, 8),
+            };
+            ToolTipService.SetToolTip(b, d.Name);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(b, d.Name + ", " + detail);
+            b.Click += (s, e) => openMain("aula");
             return b;
         }
 
@@ -261,13 +286,17 @@ namespace LiteOptions.SettingsApp
             Grid.SetColumn(kt, 1);
             devices.Children.Add(mt);
             devices.Children.Add(kt);
+            // the Aula, while it's connected: a full-width row under the two tiles
             var a = store.Aula;
-            while (devices.ColumnDefinitions.Count > 2) devices.ColumnDefinitions.RemoveAt(2);
+            devices.RowDefinitions.Clear();
             if (a != null)
             {
-                devices.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                var at = DeviceTile(a, false, (a.HasBattery ? a.BatteryText : "Connected") + " · " + AulaPage.ShortConnection(a), "aula");
-                Grid.SetColumn(at, 2);
+                devices.RowSpacing = 8;
+                devices.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                devices.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                var at = DeviceRow(a);
+                Grid.SetRow(at, 1);
+                Grid.SetColumnSpan(at, 2);
                 devices.Children.Add(at);
             }
 
