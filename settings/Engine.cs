@@ -135,7 +135,7 @@ namespace LiteOptions.SettingsApp
             new DeviceDto { Key = "aula", Name = "Aula F108 Pro", Kind = "Aula", Connection = "USB cable", Pid = 0x800A, Online = true, Firmware = "v0120",
                 CanConfigure = true, ClockSynced = "today at 16:05" },
         };
-        readonly SystemDto system = new SystemDto { Version = "2.4.0", Installed = true, PointerSpeed = 10, Precision = true, WheelLines = 3, Startup = true, ReverseScroll = 0, Architecture = RuntimeInformation.ProcessArchitecture.ToString() };
+        readonly SystemDto system = new SystemDto { Version = "2.4.1", Installed = true, PointerSpeed = 10, Precision = true, WheelLines = 3, Startup = true, ReverseScroll = 0, Architecture = RuntimeInformation.ProcessArchitecture.ToString() };
 
         public bool Connected { get; private set; }
         public event Action<bool> ConnectionChanged;

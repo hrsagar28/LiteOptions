@@ -22,6 +22,8 @@ namespace LiteOptions.Hid
         IAulaPort OpenConfig(HidCollectionInfo info);
         /// <summary>Open a collection read-only and pass on whatever it sends. Never writes.</summary>
         IDisposable Listen(HidCollectionInfo info, Action<byte[]> report);
+        /// <summary>The keyboard connected over Bluetooth, with the battery level Windows has for it; null if not connected.</summary>
+        BluetoothDeviceInfo FindBluetooth();
     }
 
     /// <summary>
@@ -92,7 +94,9 @@ namespace LiteOptions.Hid
 
     public sealed class AulaState
     {
-        public string Connection = "";      // "" not found | "USB cable" | "2.4 GHz dongle"
+        public string Connection = "";      // "" not found | "USB cable" | "Bluetooth" | "2.4 GHz dongle"
+        public string BluetoothName = "";
+        public int Battery = -1;            // percent, -1 unknown (only known over Bluetooth so far)
         public bool CanConfigure;           // the cable's settings channel is open
         public ushort Version;              // the keyboard's (or dongle's) device version
         public DateTime? ClockSyncedAt;
@@ -116,7 +120,7 @@ namespace LiteOptions.Hid
         readonly List<IDisposable> listeners = new List<IDisposable>();
         readonly Dictionary<string, int> seenReports = new Dictionary<string, int>();
         Thread worker;
-        Timer scanDebounce;
+        Timer scanDebounce, poll;
         IAulaPort port;
         string portPath, dongleKey, lastSignature = "";
         int reportLines;
@@ -127,6 +131,8 @@ namespace LiteOptions.Hid
         /// <summary>Pause after each report, as the Aula app does (config.xml cmd_delaytime).</summary>
         public int DelayMs = 35;
         public int MaxReportLines = 80;
+        /// <summary>How often to look again while it's on Bluetooth (Windows doesn't announce battery changes).</summary>
+        public int PollMs = 5 * 60 * 1000;
 
         public AulaManager(IAulaSource source, Func<AppSettings> getSettings)
         {
@@ -146,6 +152,7 @@ namespace LiteOptions.Hid
             }) { IsBackground = true, Name = "aula" };
             worker.Start();
             Post(Scan);
+            poll = new Timer(_ => { if (Snapshot().Connection == "Bluetooth") Post(Scan); }, null, PollMs, PollMs);
         }
 
         void Post(Action a) { if (!disposed) try { work.Add(a); } catch (InvalidOperationException) { } }
@@ -178,6 +185,8 @@ namespace LiteOptions.Hid
             var cable = all.Where(c => c.Vid == AulaProtocol.CableVid && c.Pid == AulaProtocol.CablePid).ToList();
             var config = cable.FirstOrDefault(c => c.UsagePage == AulaProtocol.ConfigUsagePage);
             var dongle = all.Where(c => c.Vid == AulaProtocol.DongleVid && c.Pid == AulaProtocol.DonglePid).ToList();
+            BluetoothDeviceInfo bt = null;
+            try { bt = source.FindBluetooth(); } catch (Exception ex) { Logger.Write("Aula: Bluetooth lookup failed: " + ex.Message); }
 
             string signature = string.Join("|", all.Select(c => c.Path).OrderBy(p => p));
             if (signature != lastSignature)
@@ -236,13 +245,19 @@ namespace LiteOptions.Hid
                 changed = true;
             }
 
-            string conn = config != null ? "USB cable" : dongle.Count > 0 ? "2.4 GHz dongle" : "";
+            // the keyboard can only be on one of these; the dongle stays plugged in whichever it uses
+            string conn = config != null ? "USB cable" : bt != null ? "Bluetooth" : dongle.Count > 0 ? "2.4 GHz dongle" : "";
             ushort ver = (config ?? cable.FirstOrDefault() ?? dongle.FirstOrDefault())?.Version ?? 0;
+            int battery = conn == "Bluetooth" ? bt.Battery : -1;
             lock (gate)
             {
-                if (state.Connection != conn || state.Version != ver) changed = true;
+                if (conn == "Bluetooth" && (state.Connection != conn || state.Battery != battery))
+                    Logger.Write($"Aula F108 Pro on Bluetooth as \"{bt.Name}\": battery {(battery >= 0 ? battery + "%" : "not reported")}");
+                if (state.Connection != conn || state.Version != ver || state.Battery != battery) changed = true;
                 state.Connection = conn;
                 state.Version = ver;
+                state.Battery = battery;
+                state.BluetoothName = bt?.Name ?? "";
                 if (conn == "") state.LastError = "";
             }
             if (changed) RaiseChanged();
@@ -334,7 +349,7 @@ namespace LiteOptions.Hid
         {
             if (disposed) return;
             disposed = true;
-            lock (gate) scanDebounce?.Dispose();
+            lock (gate) { scanDebounce?.Dispose(); poll?.Dispose(); }
             work.CompleteAdding();
             worker?.Join(1000);
             ClosePort();
@@ -352,6 +367,10 @@ namespace LiteOptions.Hid
         }
 
         public IAulaPort OpenConfig(HidCollectionInfo info) => WinAulaPort.Open(info);
+
+        /// <summary>Windows names it after the keyboard ("AULA-F108Pro-1" and the like).</summary>
+        public BluetoothDeviceInfo FindBluetooth() => HidEnumerator.FindBluetooth(n =>
+            n.IndexOf("AULA", StringComparison.OrdinalIgnoreCase) >= 0 || n.IndexOf("F108", StringComparison.OrdinalIgnoreCase) >= 0);
 
         public IDisposable Listen(HidCollectionInfo info, Action<byte[]> report)
         {

@@ -231,6 +231,8 @@ namespace LiteOptions.Tests
     {
         public bool Cable, Dongle;
         public bool FailWrites;
+        public int Bluetooth = -2;   // -2 not on Bluetooth; else its battery (-1 unknown)
+        public BluetoothDeviceInfo FindBluetooth() => Bluetooth == -2 ? null : new BluetoothDeviceInfo { Name = "AULA-F108Pro-1", Battery = Bluetooth };
         public readonly List<byte[]> Written = new List<byte[]>();
         public int Reads, Opened, Closed, Listening, ListenOpened;
         public readonly List<Action<byte[]>> Listeners = new List<Action<byte[]>>();

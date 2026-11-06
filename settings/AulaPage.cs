@@ -112,8 +112,11 @@ namespace LiteOptions.SettingsApp
 
             // ── battery ──
             batteryHeader = Section("Battery");
-            batteryNote = Add(new NoteCard("The keyboard's screen shows its battery level. LiteOptions is learning how the dongle reports it, so it can show it here and warn you when it's low."));
+            batteryNote = Add(new NoteCard("On Bluetooth, LiteOptions shows the keyboard's battery and warns you when it's low. On the dongle it's still learning how the battery is reported; the keyboard's screen shows it meanwhile."));
         }
+
+        /// <summary>"Cable", "Bluetooth" or "Dongle".</summary>
+        public static string ShortConnection(DeviceDto d) => d.Connection == "USB cable" ? "Cable" : d.Connection == "Bluetooth" ? "Bluetooth" : "Dongle";
 
         static TextBlock Value() => new TextBlock { Width = 24, VerticalAlignment = VerticalAlignment.Center, Style = Ui.Style("BodyStrongTextBlockStyle") };
 
@@ -221,6 +224,8 @@ namespace LiteOptions.SettingsApp
                 statusCard.Title = "Aula F108 Pro";
                 statusCard.Description = d.Connection == "USB cable"
                     ? "Connected by USB cable" + (d.Firmware != "" ? " · " + d.Firmware : "")
+                    : d.Connection == "Bluetooth"
+                    ? "Connected by Bluetooth" + (d.HasBattery ? " · battery " + d.BatteryText : "") + ". Lighting and the clock change over the USB cable."
                     : "Dongle plugged in. Lighting and the clock change over the USB cable.";
             }
             cableNote.Shown = !cable;
@@ -228,8 +233,9 @@ namespace LiteOptions.SettingsApp
             lightGroup.Opacity = cable ? 1 : 0.6;
             syncNow.IsEnabled = cable;
             syncCard.Description = d != null && d.ClockSynced != "" ? "Last set " + d.ClockSynced : "Keeps the date and time on its screen right";
-            batteryNote.Shown = d != null && !cable;
-            Show(batteryHeader, d != null && !cable);
+            bool donglePending = d != null && d.Connection == "2.4 GHz dongle";
+            batteryNote.Shown = donglePending;
+            Show(batteryHeader, donglePending);
             if (d != null && d.LastError != "") ShowError(d.LastError);
             else if (d == null || cable) errorNote.Shown = false;
         }

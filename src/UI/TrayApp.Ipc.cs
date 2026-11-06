@@ -68,6 +68,7 @@ namespace LiteOptions.UI
                     Key = "aula", Name = "Aula F108 Pro", Kind = "Aula", Connection = a.Connection, Online = true,
                     Pid = a.Connection == "USB cable" ? AulaProtocol.CablePid : AulaProtocol.DonglePid,
                     Firmware = a.Version == 0 ? "" : "v" + a.Version.ToString("X4"), CanConfigure = a.CanConfigure, LastError = a.LastError ?? "",
+                    HasBattery = a.Battery >= 0, BatteryPercent = a.Battery, BatteryLow = a.Battery >= 0 && a.Battery <= Settings.LowBatteryPercent,
                     ClockSynced = a.ClockSyncedAt == null ? "" : a.ClockSyncedAt.Value.ToString(a.ClockSyncedAt.Value.Date == DateTime.Today ? "'today at' HH:mm" : "d MMM 'at' HH:mm"),
                 });
             return list;

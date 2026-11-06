@@ -175,6 +175,14 @@ namespace LiteOptions.SettingsApp
             double thickness = Math.Max(2.5, size / 20);
             var g = pct >= 0 && d.Online ? Make(size, thickness, pct / 100.0, BatteryBrush(pct, d.Charging, low))
                                          : Make(size, thickness, 0, Ui.Brush("TextFillColorDisabledBrush"));
+            bool online = d != null && d.Online;
+            if (d?.Kind == "Aula")
+            {
+                // no photo of the Aula: a keyboard symbol inside the ring
+                g.Children.Add(new FontIcon { Glyph = Glyph.Keyboard, FontSize = size * 0.4, Opacity = online ? 1.0 : 0.45 });
+                ToolTipService.SetToolTip(g, pct >= 0 ? d.Name + ": " + pct + "% battery" : d.Name);
+                return g;
+            }
             var img = new Image
             {
                 Source = DeviceHero.Photo(mouse),

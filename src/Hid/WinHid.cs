@@ -34,6 +34,12 @@ namespace LiteOptions.Hid
             $"PID {Pid:X4} page {UsagePage:X4} usage {Usage:X4} in {InLen} out {OutLen} \"{Product}\" parent {ParentId}";
     }
 
+    public sealed class BluetoothDeviceInfo
+    {
+        public string Name;
+        public int Battery = -1;   // percent, -1 unknown
+    }
+
     /// <summary>Enumerates HID collections with SetupAPI.</summary>
     public static class HidEnumerator
     {
@@ -80,6 +86,68 @@ namespace LiteOptions.Hid
             }
             finally { Native.SetupDiDestroyDeviceInfoList(devs); }
             return list;
+        }
+
+        /// <summary>
+        /// A keyboard on Bluetooth whose name matches: found through its Bluetooth HID collections (present only while it's
+        /// connected), then up through their parent device nodes to the one with its name and Windows' battery level.
+        /// </summary>
+        public static BluetoothDeviceInfo FindBluetooth(Func<string, bool> nameMatches)
+        {
+            Native.HidD_GetHidGuid(out Guid hidGuid);
+            IntPtr devs = Native.SetupDiGetClassDevs(ref hidGuid, IntPtr.Zero, IntPtr.Zero, Native.DIGCF_PRESENT | Native.DIGCF_DEVICEINTERFACE);
+            if (devs == Native.INVALID_HANDLE_VALUE) return null;
+            var seen = new HashSet<uint>();
+            try
+            {
+                for (int i = 0; ; i++)
+                {
+                    var did = new Native.SP_DEVICE_INTERFACE_DATA { cbSize = Marshal.SizeOf(typeof(Native.SP_DEVICE_INTERFACE_DATA)) };
+                    if (!Native.SetupDiEnumDeviceInterfaces(devs, IntPtr.Zero, ref hidGuid, i, ref did)) break;
+                    var devInfo = new Native.SP_DEVINFO_DATA { cbSize = Marshal.SizeOf(typeof(Native.SP_DEVINFO_DATA)) };
+                    Native.SetupDiGetDeviceInterfaceDetail(devs, ref did, IntPtr.Zero, 0, out _, ref devInfo);
+                    string id = DeviceId(devInfo.DevInst)?.ToUpperInvariant() ?? "";
+                    // HID over GATT (Bluetooth LE) or classic Bluetooth HID
+                    if (!id.Contains("{00001812-") && !id.Contains("{00001124-")) continue;
+
+                    uint node = devInfo.DevInst;
+                    string name = null; int battery = -1;
+                    for (int up = 0; up < 4; up++)
+                    {
+                        if (Native.CM_Get_Parent(out uint parent, node, 0) != 0) break;
+                        node = parent;
+                        if (!seen.Add(node) && name == null) break;
+                        string n = StringProperty(node, Native.DEVPKEY_Device_FriendlyName);
+                        int b = ByteProperty(node, Native.DEVPKEY_Bluetooth_Battery);
+                        if (b >= 0 && battery < 0) battery = b;
+                        if (n != null && nameMatches(n)) name = n;
+                        if (name != null && battery >= 0) break;
+                    }
+                    if (name != null) return new BluetoothDeviceInfo { Name = name, Battery = battery > 100 ? -1 : battery };
+                }
+            }
+            finally { Native.SetupDiDestroyDeviceInfoList(devs); }
+            return null;
+        }
+
+        static string DeviceId(uint devInst)
+        {
+            var sb = new StringBuilder(512);
+            return Native.CM_Get_Device_ID(devInst, sb, sb.Capacity, 0) == 0 ? sb.ToString() : null;
+        }
+
+        static string StringProperty(uint devInst, Native.DEVPROPKEY key)
+        {
+            int size = 1024; var buf = new byte[size];
+            if (Native.CM_Get_DevNode_Property(devInst, ref key, out uint type, buf, ref size, 0) != 0 || type != 0x12 /* DEVPROP_TYPE_STRING */) return null;
+            return Encoding.Unicode.GetString(buf, 0, Math.Max(0, size - 2)).TrimEnd('\0');
+        }
+
+        static int ByteProperty(uint devInst, Native.DEVPROPKEY key)
+        {
+            int size = 8; var buf = new byte[size];
+            if (Native.CM_Get_DevNode_Property(devInst, ref key, out uint type, buf, ref size, 0) != 0 || size < 1) return -1;
+            return buf[0];
         }
 
         static string ParentOf(uint devInst)

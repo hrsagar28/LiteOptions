@@ -550,6 +550,23 @@ namespace LiteOptions.Tests
             st = m.Snapshot();
             Check(err != null && !st.CanConfigure && st.LastError != "" && src.Closed == 2, "failed write: error shown, channel closed to reopen: " + err);
 
+            // on Bluetooth (dongle still plugged in): Bluetooth wins, battery from Windows, nothing written
+            src.FailWrites = false; src.Cable = false; src.Dongle = true; src.Bluetooth = 64; src.Written.Clear();
+            m.ScanForTests(); m.RunPendingForTests();
+            st = m.Snapshot();
+            Check(st.Connection == "Bluetooth" && st.Battery == 64 && st.BluetoothName == "AULA-F108Pro-1" && !st.CanConfigure && src.Written.Count == 0,
+                "Bluetooth: connection and Windows' battery level, nothing written: " + st.Connection + " " + st.Battery);
+            Check(Logger.Snapshot().Contains("on Bluetooth as \"AULA-F108Pro-1\": battery 64%"), "Bluetooth battery logged");
+            src.Bluetooth = 12; changes = 0;
+            m.ScanForTests(); m.RunPendingForTests();
+            Check(m.Snapshot().Battery == 12 && changes > 0, "battery change noticed on the next look");
+            src.Bluetooth = -1;
+            m.ScanForTests(); m.RunPendingForTests();
+            Check(m.Snapshot().Connection == "Bluetooth" && m.Snapshot().Battery == -1, "Bluetooth without a battery level: unknown, not 0");
+            src.Bluetooth = -2;
+            m.ScanForTests(); m.RunPendingForTests();
+            Check(m.Snapshot().Connection == "2.4 GHz dongle" && m.Snapshot().Battery == -1, "off Bluetooth: back to the dongle, battery unknown");
+
             // keyboard gone entirely
             src.FailWrites = false; src.Cable = false; src.Dongle = false;
             m.ScanForTests(); m.RunPendingForTests();

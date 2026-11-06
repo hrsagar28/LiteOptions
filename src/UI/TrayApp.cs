@@ -227,7 +227,7 @@ namespace LiteOptions.UI
                           $"{(d.Firmware != null ? " | fw " + d.Firmware : "")}{(d.LastError != null ? " | last error: " + d.LastError : "")}");
             var a = Aula.Snapshot();
             lines.Add(a.Present
-                ? $"Aula F108 Pro: {a.Connection} | v{a.Version:X4} | settings {(a.CanConfigure ? "open" : "closed")} | clock {(a.ClockSyncedAt?.ToString("yyyy-MM-dd HH:mm") ?? "not set")}{(a.LastError != "" ? " | last error: " + a.LastError : "")}"
+                ? $"Aula F108 Pro: {a.Connection}{(a.BluetoothName != "" ? " \"" + a.BluetoothName + "\"" : "")}{(a.Battery >= 0 ? " | battery " + a.Battery + "%" : "")} | v{a.Version:X4} | settings {(a.CanConfigure ? "open" : "closed")} | clock {(a.ClockSyncedAt?.ToString("yyyy-MM-dd HH:mm") ?? "not set")}{(a.LastError != "" ? " | last error: " + a.LastError : "")}"
                 : "Aula F108 Pro: not found");
             lines.Add("");
             lines.Add("Logitech HID collections:");
@@ -328,6 +328,13 @@ namespace LiteOptions.UI
                 int bucket = IsLow(d.Battery) ? 2 : (d.Battery.Percent.HasValue ? (d.Battery.Percent <= 30 ? 1 : 0) : (d.Battery.Level == "Low" ? 1 : 0));
                 if (best == null || f < best.Value.Item1) best = (f, bucket);
             }
+            var a = Aula.Snapshot();
+            if (a.Battery >= 0)
+            {
+                double f = a.Battery / 100.0;
+                int bucket = a.Battery <= Settings.LowBatteryPercent ? 2 : a.Battery <= 30 ? 1 : 0;
+                if (best == null || f < best.Value.Item1) best = (f, bucket);
+            }
             return best;
         }
 
@@ -388,6 +395,13 @@ namespace LiteOptions.UI
                 if (warnedAt.TryGetValue(d.Key, out int last) && level > last - 5) continue;
                 warnedAt[d.Key] = level;
                 tray.ShowBalloonTip(8000, "Battery low", $"{d.Name}: {b.Text}. Time for a fresh {(d.Kind == DeviceKind.Mouse ? "AA" : "AAA")} battery soon.", ToolTipIcon.Warning);
+            }
+            var aula = Aula.Snapshot();
+            if (aula.Battery < 0 || aula.Battery > Settings.LowBatteryPercent) warnedAt.Remove("aula");
+            else if (!warnedAt.TryGetValue("aula", out int was) || aula.Battery <= was - 5)
+            {
+                warnedAt["aula"] = aula.Battery;
+                tray.ShowBalloonTip(8000, "Battery low", $"Aula F108 Pro: {aula.Battery}%. Time to charge it with its USB-C cable.", ToolTipIcon.Warning);
             }
         }
 

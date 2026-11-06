@@ -181,6 +181,14 @@ namespace LiteOptions
         public static extern int CM_Get_Parent(out uint parent, uint devInst, int flags);
         [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode, EntryPoint = "CM_Get_Device_IDW")]
         public static extern int CM_Get_Device_ID(uint devInst, StringBuilder buffer, int bufferLen, int flags);
+        [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode, EntryPoint = "CM_Get_DevNode_PropertyW")]
+        public static extern int CM_Get_DevNode_Property(uint devInst, ref DEVPROPKEY key, out uint propertyType, byte[] buffer, ref int bufferSize, int flags);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct DEVPROPKEY { public Guid fmtid; public uint pid; public DEVPROPKEY(string g, uint p) { fmtid = new Guid(g); pid = p; } }
+        public static readonly DEVPROPKEY DEVPKEY_Device_FriendlyName = new DEVPROPKEY("a45c254e-df1c-4efd-8020-67d146a850e0", 14);
+        /// <summary>The battery level Windows shows in Bluetooth & devices (a byte, 0-100).</summary>
+        public static readonly DEVPROPKEY DEVPKEY_Bluetooth_Battery = new DEVPROPKEY("104ea319-6ee2-4701-bd47-8ddbf425bbe5", 2);
 
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         public static extern IntPtr CreateFile(string name, uint access, uint share, IntPtr security, uint creation, uint flags, IntPtr template);

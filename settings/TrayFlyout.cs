@@ -208,7 +208,7 @@ namespace LiteOptions.SettingsApp
         }
 
         /// <summary>A device: its photo in a battery ring, its name, and one line about it. Clicking it opens its page.</summary>
-        FrameworkElement DeviceTile(DeviceDto d, bool mouse, string detail)
+        FrameworkElement DeviceTile(DeviceDto d, bool mouse, string detail, string page = null)
         {
             var stack = new StackPanel { Spacing = 4, HorizontalAlignment = HorizontalAlignment.Center };
             var ring = Ring.Device(d, mouse, 64, store.IsLow(d));
@@ -227,7 +227,7 @@ namespace LiteOptions.SettingsApp
             };
             ToolTipService.SetToolTip(b, name);
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(b, name + ", " + detail);
-            b.Click += (s, e) => openMain(mouse ? "mouse" : "keys");
+            b.Click += (s, e) => openMain(page ?? (mouse ? "mouse" : "keys"));
             return b;
         }
 
@@ -261,6 +261,15 @@ namespace LiteOptions.SettingsApp
             Grid.SetColumn(kt, 1);
             devices.Children.Add(mt);
             devices.Children.Add(kt);
+            var a = store.Aula;
+            while (devices.ColumnDefinitions.Count > 2) devices.ColumnDefinitions.RemoveAt(2);
+            if (a != null)
+            {
+                devices.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                var at = DeviceTile(a, false, (a.HasBattery ? a.BatteryText : "Connected") + " · " + AulaPage.ShortConnection(a), "aula");
+                Grid.SetColumn(at, 2);
+                devices.Children.Add(at);
+            }
 
             // top row
             bool fnOk = k != null && k.FnSupported;

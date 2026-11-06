@@ -103,7 +103,7 @@ namespace LiteOptions.UI
             clock.Add(new SettingRow(null, "Set the clock to this PC's time now", "Needs the USB cable", aulaSyncNow));
             Add(pageAula, clock);
 
-            Add(pageAula, NoteCard("Battery: the keyboard's screen shows its level. LiteOptions is learning how the dongle reports it, so it can show it here and warn you when it's low."));
+            Add(pageAula, NoteCard("Battery: on Bluetooth LiteOptions shows it and warns you when it's low. On the dongle it's still learning how the battery is reported; the keyboard's screen shows it meanwhile."));
         }
 
         void AulaChanged()
@@ -158,6 +158,7 @@ namespace LiteOptions.UI
             aulaStatus.Description = !a.Present
                 ? "Plug in its 2.4 GHz dongle or its USB-C cable. LiteOptions can't see it over Bluetooth."
                 : a.Connection == "USB cable" ? "Connected by USB cable" + (a.Version != 0 ? " · v" + a.Version.ToString("X4") : "")
+                : a.Connection == "Bluetooth" ? "Connected by Bluetooth" + (a.Battery >= 0 ? " · battery " + a.Battery + "%" : "") + ". Lighting and the clock change over the USB cable."
                 : "Dongle plugged in. Lighting and the clock change over the USB cable.";
             aulaCableNote.Visible = !a.CanConfigure;
             foreach (var r in new Control[] { aulaEffectRow, aulaColourRow, aulaRainbowRow, aulaBrightRow, aulaSpeedRow, aulaDirRow }) r.Enabled = a.CanConfigure;

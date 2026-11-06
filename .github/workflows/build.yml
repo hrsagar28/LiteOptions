@@ -232,6 +232,10 @@ jobs:
 
             Double-click it to install or update (your settings are kept). Windows may say "Windows protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
 
+            New in 2.4.1:
+            - Aula F108 Pro on Bluetooth: LiteOptions recognises it, shows the battery level Windows has for it (on its page, in the menu and in the tray panel, with a ring) and warns when it's low.
+            - The Aula also appears in the tray panel next to the mouse and keyboard.
+
             New in 2.4: Aula F108 Pro
             - A page for the Aula F108 Pro mechanical keyboard, in place of Aula's own app: backlight effect, colour or rainbow, brightness, speed and direction.
             - Sets the keyboard's screen clock whenever its USB-C cable is plugged in (can be switched off), or with "Set it now".

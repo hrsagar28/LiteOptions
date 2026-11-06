@@ -351,13 +351,8 @@ namespace LiteOptions.SettingsApp
         /// <summary>The Aula in the menu, shown only while it's plugged in (cable or dongle). No battery ring: it doesn't report one yet.</summary>
         FrameworkElement AulaRow(DeviceDto d)
         {
-            var badge = new Border
-            {
-                Width = 44, Height = 44, CornerRadius = new CornerRadius(22),
-                Background = Ui.Brush("SubtleFillColorSecondaryBrush"),
-                Child = new FontIcon { Glyph = Glyph.Keyboard, FontSize = 20 },
-            };
-            string state = d.Connection == "USB cable" ? "Cable · Connected" : "Dongle";
+            var badge = Ring.Device(d, false, 44, store.IsLow(d));
+            string state = AulaPage.ShortConnection(d) + (d.HasBattery ? " · " + d.BatteryText : "");
             var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 0 };
             texts.Children.Add(new TextBlock { Text = d.Name, Style = Ui.Style("BodyStrongTextBlockStyle"), TextTrimming = TextTrimming.CharacterEllipsis });
             texts.Children.Add(new TextBlock { Text = state, Style = Ui.Style("Secondary"), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap });
