@@ -1,0 +1,231 @@
+
+== HID++ against a simulated Pebble Mouse 2 (BLE, long reports only)
+  ok   ping answers with HID++ 4.x
+  ok   protocol major parsed
+  ok   uses 20-byte long reports only
+  ok   device name read in chunks
+  ok   device type = mouse
+  ok   firmware string: RQM 40.02.B0017
+  ok   unified battery level-only → Good: Good
+  ok   unified battery Low flagged
+  ok   DPI range parsed 400-4000 step 100 (37)
+  ok   current/default DPI
+  ok   DPI write/readback
+  ok   nearest DPI snapping
+  ok   mouse has no Fn inversion
+
+== Responses with device index 0x00 and interleaved notifications
+  ok   reply with index 0x00 accepted for 0xFF request
+  ok   notification delivered separately, not mistaken for the reply
+
+== K380 behind a short-report-only collection
+  ok   ping over short reports
+  ok   uses 7-byte short reports
+  ok   name assembled from 3-byte chunks
+  ok   Fn inversion found (0x40A0 at index 0x0B)
+  ok   factory state = media keys first
+  ok   write matches k380_conf 'fkeys on' (10 ff 0b 1x 00)
+  ok   F1-F12 first after write
+  ok   battery status 0x1000 percent
+
+== Errors and timeouts
+  ok   missing feature → NotSupported
+  ok   device error code surfaced (0x07)
+  ok   asleep device → timeout, promptly
+  ok   ping false when asleep
+  ok   recovers after waking
+
+== Device manager: discovery, applying settings, reconnects
+  ok   found 2 devices
+  ok   mouse identified
+  ok   keyboard identified
+  ok   saved DPI applied, snapped to 100 steps: 1600
+  ok   saved F-key mode applied to K380
+  ok   keyboard battery read
+
+== Easy-Switch channels
+  ok   keyboard: 3 channels, channel 2 is this computer
+  ok   empty channel 1, channel 2 named
+  ok   long UTF-8 name read in chunks: Anna’s iPhone 15 Pro Max
+
+== Keys the K380 switches off itself (0x4521)
+  ok   capabilities read; nothing switched off while the setting is untouched
+  ok   Caps Lock switched off; unsupported keys ignored
+  ok   poll puts it back if the keyboard forgot
+  ok   unticking turns it back on
+  ok   mouse without names: channel count and current channel only
+
+== Mouse power-cycles (DPI resets) and sends 'reconfigure me'
+  ok   DPI re-applied after reconnect: 1600
+
+== Keyboard forgets setting without notifying; 5-minute poll fixes it
+  ok   poll re-applied F-key mode
+
+== Live DPI changes and Fn toggle from the UI
+  ok   latest DPI wins
+  ok   Fn toggle to media keys
+
+== Device asleep, then unplugged
+  ok   mouse marked asleep after 2 failed polls
+  ok   30-second revive check: back online and DPI restored (1600)
+  ok   dead link dropped, keyboard kept
+  ok   no reopen churn for healthy devices
+
+== Keyboard reconnects but ignores the first write; a quick retry fixes it
+  ok   first write unanswered: keyboard still on media keys
+  ok   retry a couple of seconds later sets F1–F12 (no 5-minute wait)
+  ok   gives up after 3 retries instead of looping
+
+== Settings 'unchanged' leaves devices alone
+  ok   DPI untouched when no DPI saved
+
+== Logi Bolt receiver with the mouse in slot 2
+  ok   mouse found in slot 2
+  ok   connection labelled Bolt
+
+== Settings file
+  ok   empty file → sensible defaults
+  ok   round-trip keeps values
+  ok   v1.2 adds Ctrl+Esc → switch top row, exactly once
+  ok   an existing Ctrl+Esc remap is left alone
+  ok   app profile lower-cased and kept
+  ok   file is indented/readable
+
+== Middle button
+  ok   default: middle click passes through
+  ok   action: press swallowed
+  ok   action: Back fired once on press
+  ok   action: release swallowed
+  ok   pointer moves normally
+  ok   gesture: pointer frozen while held
+  ok   swipe up → Task View
+  ok   swipe right → next desktop
+  ok   tiny movement → click action (middle click)
+  ok   unassigned direction does nothing
+
+== Per-app middle button
+  ok   Excel profile overrides global
+  ok   'Same as All applications' falls back to global gestures
+  ok   paused: passes through
+
+== Key remapping
+  ok   remapped media key swallowed, action fired
+  ok   auto-repeat swallowed, one-shot action not re-fired
+  ok   release swallowed
+  ok   stray second release passes
+  ok   volume-type actions repeat while held
+  ok   modifiers pass through
+  ok   Ctrl+Shift+F swallowed
+  ok   held modifiers released before the action, no mask needed
+  ok   auto-repeat of a lifted modifier hidden
+  ok   remaining releases swallowed
+  ok   Ctrl behaves normally afterwards
+  ok   plain F still types
+  ok   Win combo sends mask key so Start menu stays shut
+  ok   Win release swallowed (already lifted)
+
+== Per-app key overrides and pause
+  ok   'Normal key' in VLC cancels the global remap
+  ok   global remap active elsewhere
+  ok   paused: keys pass through
+
+== Smooth scrolling
+  ok   one wheel click arrives in full: 120
+  ok   spread over small steps (32 steps, first 11)
+  ok   two quick clicks the other way add up: -240
+  ok   reversing drops the rest of the old glide: -120
+  ok   notched wheel click taken over when smooth scrolling is on
+  ok   touchpad-sized steps pass straight through
+  ok   Ctrl + wheel (zoom) passes straight through
+  ok   off by default: wheel untouched
+
+== Recording a shortcut
+  ok   modifiers swallowed while recording
+  ok   key swallowed while recording
+  ok   recorded Ctrl+Shift+K
+  ok   releases swallowed
+  ok   last release swallowed and recording ends
+  ok   typing works again afterwards
+  ok   Esc cancels recording
+  ok   and input is released
+
+== v1.2: top-row shortcut, pause key, gesture pop-ups, tray badge, pop-up drawing
+  ok   Ctrl+Esc swallowed (Start menu doesn't open)
+  ok   Ctrl+Esc runs 'switch top row'
+  ok   switch top row is an app command
+  ok   paused: ordinary remaps off
+  ok   paused: the pause key still works
+  ok   gesture event reports direction + action for the pop-up
+  ok   plain click: no pop-up
+  ok   tray badge drawn in the corner (24px)
+  ok   pop-up renders with transparent edges (336×126)
+  ok   DPI pop-up with progress bar renders, about Windows' size (266×76)
+  ok   Caps Lock pop-up with a key cap and its light (248×84)
+
+== Aula F108 Pro (pretend keyboard)
+  ok   lighting packet: mode, colour, brightness, speed, trailer 55 AA at 14
+  ok   lighting off: only the mode and the trailer
+  ok   lighting values clamped to what the keyboard accepts
+  ok   clock packet: 26-11-06 16:05:09 Friday, trailer 55 AA at 62
+  ok   begin 04 18, apply 04 02, finish 04 F0
+  ok   lighting start 04 13, clock start 04 28, both with byte 8 = 1
+  ok   which effects take a colour, a speed and a direction
+  ok   dongle plugged in, keyboard not answering: 2.4 GHz dongle
+  ok   dongle: command channel opened, two others listened to, nothing on a cable
+  ok   keyboard not answering: only the battery query (20 01, checksum 21), 3 tries
+  ok   other dongle reports logged as hex
+  ok   lighting with the keyboard not answering: error, tells you to wake it: The keyboard didn't answer through the dongle. Press a key to wake it (and check it's switched to 2.4G), then try again.
+  ok   the window is told about the keyboard
+  ok   keyboard on the dongle: battery 59% from its answer: 2.4 GHz dongle awake=True batt=59 can=True writes=2
+  ok   clock set through the dongle when it turns up: 0C 10 … 5A 26-11-06 16:06:09 Fri, AA 55, checksum
+  ok   dongle clock sync remembered
+  ok   next poll: just the battery query, no second clock within the hour
+  ok   battery follows the keyboard's answers
+  ok   battery answers to the Aula app's own queries count too
+  ok   an answer with a wrong checksum is ignored
+  ok   lighting over the dongle: one report, echoed
+  ok   dongle lighting packet: 05 10 00, mode, colour, rainbow, brightness, speed, direction, AA 55, checksum
+  ok   dongle lighting off: only the mode and the end marker
+  ok   dongle lighting logged
+  ok   keyboard quiet for 4 minutes (asleep): not answering, last battery kept, changes still allowed (they wake-check)
+  ok   cable wins over the dongle; settings open
+  ok   plug-in: clock set with begin, start, data, apply and four read-backs
+  ok   clock sync time remembered
+  ok   scanning again changes nothing
+  ok   lighting: 5 reports, 3 read-backs
+  ok   lighting: start, data (Rolling, direction 1), finish
+  ok   cable out: settings channel closed, back to the dongle
+  ok   clock sync switched off: nothing written on plug-in
+  ok   failed write: error shown, channel closed to reopen: The keyboard didn't take the clock change. Unplug the cable and plug it in again.
+  ok   Bluetooth: connection and Windows' battery level, nothing written: Bluetooth 64
+  ok   Bluetooth battery logged
+  ok   battery change noticed on the next look
+  ok   Bluetooth without a battery level: unknown, not 0
+  ok   answering through the dongle beats a lingering Bluetooth entry: 2.4 GHz dongle
+  ok   connection change logged
+  ok   off Bluetooth, keyboard quiet: dongle, last battery kept
+  ok   nothing plugged in: not present, dongle channel and listeners closed
+  ok   Aula settings round-trip
+  ok   settings from 2.3.3: clock sync on, lighting untouched
+
+== Aula F108 Pro system settings (pretend keyboard)
+  ok   cable settings data: 00 01, Win, Alt+F4, Alt+Tab, Fn, sleep, -, response, AA 55 at 62
+  ok   cable settings header 04 17 with bytes 2 and 8 set
+  ok   cable settings: begin, header, data (no read-back), apply
+  ok   dongle settings: 07 10, fields from byte 5, AA 55 at 18, checksum
+  ok   settings clamped to what the keyboard accepts
+  ok   defaults are the Aula app's: 5 minutes, level 2, nothing blocked
+  ok   settings through the dongle: one report, echoed
+  ok   settings over the cable: 4 reports, 3 read-backs
+  ok   settings logged
+  ok   system settings round-trip
+
+== Helpers
+  ok   combo naming
+  ok   key naming
+  ok   describe shortcut
+  ok   voltage estimates AA 90 / 2xAAA 50 / Li-ion 93
+  ok   discrete DPI list
+  ok   preset ids unique
+
+179 passed, 0 failed

@@ -1,0 +1,9 @@
+2026-11-06 17:32:55  LiteOptions 2.6.0 starting (X64)
+2026-11-06 17:33:08  Tray panel shown 4953 ms after start
+2026-11-06 17:33:11  Settings window: Dark theme, 22 of 22 colours updated
+2026-11-06 17:33:12  Settings window: Light theme, 22 of 22 colours updated
+2026-11-06 17:33:36  Tray panel shown 328 ms after start
+2026-11-06 17:33:59  Tray panel shown 17680 ms after start
+2026-11-06 17:34:22  Settings window: Dark theme, 23 of 23 colours updated
+2026-11-06 17:34:24  Settings window: Light theme, 23 of 23 colours updated
+2026-11-06 17:34:47  Tray panel shown 17602 ms after start
