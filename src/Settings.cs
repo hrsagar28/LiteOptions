@@ -83,6 +83,49 @@ namespace LiteOptions
         }
     }
 
+    /// <summary>
+    /// Backlight of the Aula F108 Pro (Sonix keyboard). Effect numbers and limits follow the Aula app and the
+    /// open-source f108-pro tool (github.com/parsiya/f108-pro), which tested them on the keyboard.
+    /// </summary>
+    [DataContract]
+    public sealed class AulaLighting
+    {
+        [DataMember(Order = 1)] public int Mode;            // 0 off … 19, see Names
+        [DataMember(Order = 2)] public int R = 255, G = 255, B = 255;
+        [DataMember(Order = 3)] public bool Rainbow;
+        [DataMember(Order = 4)] public int Brightness = 5;  // 0-5
+        [DataMember(Order = 5)] public int Speed = 3;       // 0-5
+        [DataMember(Order = 6)] public int Direction;       // 0 or 1
+
+        [OnDeserializing]
+        void SetDefaults(StreamingContext c) { R = G = B = 255; Brightness = 5; Speed = 3; }
+
+        public static readonly string[] Names =
+        {
+            "Off", "Static", "Light up when pressed", "Go dark when pressed", "Glittering", "Falling", "Colourful", "Breathing",
+            "Spectrum", "Outward", "Scrolling", "Rolling", "Rotating", "Explode", "Launch", "Ripples", "Flowing", "Pulsating", "Tilt", "Shuttle",
+        };
+
+        /// <summary>The effect takes a colour (or rainbow): all but Off, Colourful and Spectrum.</summary>
+        public static bool HasColour(int mode) => mode != 0 && mode != 6 && mode != 8;
+        public static bool HasSpeed(int mode) => mode >= 2;
+        /// <summary>0 none, 1 left/right (Scrolling), 2 up/down (Rolling, Rotating, Flowing, Tilt).</summary>
+        public static int DirectionKind(int mode) => mode == 10 ? 1 : mode == 11 || mode == 12 || mode == 16 || mode == 18 ? 2 : 0;
+
+        public void Normalize()
+        {
+            Mode = Math.Max(0, Math.Min(19, Mode));
+            R = Clamp(R); G = Clamp(G); B = Clamp(B);
+            Brightness = Math.Max(0, Math.Min(5, Brightness));
+            Speed = Math.Max(0, Math.Min(5, Speed));
+            Direction = Direction == 1 ? 1 : 0;
+        }
+
+        static int Clamp(int v) => Math.Max(0, Math.Min(255, v));
+        public AulaLighting Clone() => (AulaLighting)MemberwiseClone();
+        public string Describe() => Names[Math.Max(0, Math.Min(19, Mode))] + (Mode == 0 ? "" : $", brightness {Brightness}" + (HasColour(Mode) ? (Rainbow ? ", rainbow" : $", #{R:X2}{G:X2}{B:X2}") : ""));
+    }
+
     [DataContract]
     public sealed class AppSettings
     {
@@ -100,12 +143,14 @@ namespace LiteOptions
         [DataMember(Order = 12)] public bool LockKeyPopups = true;     // pop-up when Caps Lock / Num Lock / Scroll Lock changes
         [DataMember(Order = 13)] public bool SmoothScroll;             // turn each wheel notch into a short glide
         [DataMember(Order = 14)] public int DisabledKeys = -1;        // keys the keyboard switches off itself (bit mask, see HidppDevice); -1 = leave alone
+        [DataMember(Order = 15)] public AulaLighting AulaLight;        // Aula F108 Pro backlight last chosen here; null = never set from LiteOptions
+        [DataMember(Order = 16)] public bool AulaClockSync = true;     // set the Aula's screen clock whenever it is plugged in by cable
 
         // DataContract skips field initialisers, so set defaults for members missing from the file.
         [OnDeserializing]
         void SetDefaults(StreamingContext c)
         {
-            Version = 1; Profiles = new List<Profile>(); FnMode = "unchanged"; LowBatteryPercent = 15; Notifications = true; ShowPopups = true; LockKeyPopups = true; DisabledKeys = -1;
+            Version = 1; Profiles = new List<Profile>(); FnMode = "unchanged"; LowBatteryPercent = 15; Notifications = true; ShowPopups = true; LockKeyPopups = true; DisabledKeys = -1; AulaClockSync = true;
         }
 
         public Profile Global => Profiles.First(p => p.IsGlobal);
@@ -134,6 +179,7 @@ namespace LiteOptions
             if (MouseDpi < 0) MouseDpi = 0;
             if (LowBatteryPercent < 0 || LowBatteryPercent > 50) LowBatteryPercent = 15;
             if (DisabledKeys < -1 || DisabledKeys > 0xFF) DisabledKeys = -1;
+            AulaLight?.Normalize();
         }
 
         public AppSettings Clone()

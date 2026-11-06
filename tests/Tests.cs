@@ -34,6 +34,7 @@ namespace LiteOptions.Tests
                 SmoothScrolling();
                 CaptureLogic();
                 V12();
+                AulaFlow();
                 Misc();
             }
             catch (Exception ex) { failed++; Console.WriteLine("CRASH " + ex); }
@@ -478,6 +479,91 @@ namespace LiteOptions.Tests
                 Check(pop.Width >= 220 && pop.Height < 90, $"DPI pop-up with progress bar renders, about Windows' size ({pop.Width}×{pop.Height})");
             using (var pop = LiteOptions.UI.Osd.Render(1f, "A", "Caps Lock on", "Letters type in capitals", null, false, LiteOptions.UI.Osd.Badge.KeyCap, true))
                 Check(pop.Height < 90 && pop.Width < 300, $"Caps Lock pop-up with a key cap and its light ({pop.Width}×{pop.Height})");
+        }
+
+        static void AulaFlow()
+        {
+            Section("Aula F108 Pro (pretend keyboard)");
+
+            // packets match what f108-pro tested on the keyboard
+            var l = new AulaLighting { Mode = 7, R = 0x80, G = 0x10, B = 0xFF, Rainbow = false, Brightness = 4, Speed = 2, Direction = 0 };
+            var p = AulaProtocol.Lighting(l);
+            Check(p.Length == 64 && p[0] == 7 && p[1] == 0x80 && p[2] == 0x10 && p[3] == 0xFF && p[8] == 0 && p[9] == 4 && p[10] == 2 && p[11] == 0 && p[14] == 0x55 && p[15] == 0xAA,
+                "lighting packet: mode, colour, brightness, speed, trailer 55 AA at 14");
+            var off = AulaProtocol.Lighting(new AulaLighting { Mode = 0, R = 1, G = 2, B = 3 });
+            Check(off[0] == 0 && off[1] == 0 && off[9] == 0 && off[14] == 0x55 && off[15] == 0xAA, "lighting off: only the mode and the trailer");
+            var wild = AulaProtocol.Lighting(new AulaLighting { Mode = 40, R = 999, Brightness = 9, Speed = -1, Direction = 7 });
+            Check(wild[0] == 19 && wild[1] == 255 && wild[9] == 5 && wild[10] == 0 && wild[11] == 0, "lighting values clamped to what the keyboard accepts");
+            var c = AulaProtocol.Clock(new DateTime(2026, 11, 6, 16, 5, 9));
+            Check(c[0] == 0 && c[1] == 1 && c[2] == 0x5A && c[3] == 26 && c[4] == 11 && c[5] == 6 && c[6] == 16 && c[7] == 5 && c[8] == 9 && c[10] == 5 && c[62] == 0x55 && c[63] == 0xAA,
+                "clock packet: 26-11-06 16:05:09 Friday, trailer 55 AA at 62");
+            Check(AulaProtocol.Begin()[0] == 4 && AulaProtocol.Begin()[1] == 0x18 && AulaProtocol.Apply()[1] == 0x02 && AulaProtocol.Finish()[1] == 0xF0, "begin 04 18, apply 04 02, finish 04 F0");
+            Check(AulaProtocol.LightingStart()[1] == 0x13 && AulaProtocol.LightingStart()[8] == 1 && AulaProtocol.ClockStart()[1] == 0x28 && AulaProtocol.ClockStart()[8] == 1, "lighting start 04 13, clock start 04 28, both with byte 8 = 1");
+            Check(AulaLighting.HasColour(1) && !AulaLighting.HasColour(6) && !AulaLighting.HasColour(8) && !AulaLighting.HasSpeed(1) && AulaLighting.HasSpeed(2)
+                  && AulaLighting.DirectionKind(10) == 1 && AulaLighting.DirectionKind(11) == 2 && AulaLighting.DirectionKind(7) == 0, "which effects take a colour, a speed and a direction");
+
+            // dongle only: listens, never writes, can't configure
+            var settings = new AppSettings(); settings.Normalize();
+            var src = new FakeAulaSource { Dongle = true };
+            var m = new AulaManager(src, () => settings) { DelayMs = 0, Now = () => new DateTime(2026, 11, 6, 16, 5, 9) };
+            int changes = 0; m.Changed += () => changes++;
+            m.ScanForTests(); m.RunPendingForTests();
+            var st = m.Snapshot();
+            Check(st.Connection == "2.4 GHz dongle" && !st.CanConfigure, "dongle found, settings not available: " + st.Connection);
+            Check(src.Listening == 1 && src.Opened == 0 && src.Written.Count == 0, "dongle: one vendor collection opened to listen, nothing written");
+            src.Listeners[0](new byte[] { 0x05, 0x40, 0x18 });
+            src.Listeners[0](new byte[] { 0x05, 0x40, 0x18 });
+            Check(Logger.Snapshot().Contains("Aula dongle page FF00: 05 40 18"), "dongle reports logged as hex");
+            string err = null;
+            m.SetLighting(new AulaLighting { Mode = 1 }, e => err = e); m.RunPendingForTests();
+            Check(err != null && err.Contains("cable") && src.Written.Count == 0, "lighting on the dongle refused without writing: " + err);
+            Check(changes > 0, "the window is told about the keyboard");
+
+            // cable plugged in: the clock is set once, lighting left alone
+            src.Cable = true;
+            m.ScanForTests(); m.RunPendingForTests();
+            st = m.Snapshot();
+            Check(st.Connection == "USB cable" && st.CanConfigure && st.Version == 0x0120, "cable wins over the dongle; settings open");
+            Check(src.Written.Count == 4 && src.Written[0][1] == 0x18 && src.Written[1][1] == 0x28 && src.Written[2][2] == 0x5A && src.Written[3][1] == 0x02 && src.Reads == 4,
+                "plug-in: clock set with begin, start, data, apply and four read-backs");
+            Check(st.ClockSyncedAt == new DateTime(2026, 11, 6, 16, 5, 9), "clock sync time remembered");
+            m.ScanForTests(); m.RunPendingForTests();
+            Check(src.Written.Count == 4 && src.Opened == 1, "scanning again changes nothing");
+
+            // lighting change: five reports, three read-backs
+            src.Written.Clear(); src.Reads = 0;
+            err = "x";
+            m.SetLighting(new AulaLighting { Mode = 11, R = 255, G = 0, B = 0, Brightness = 3, Speed = 4, Direction = 1 }, e => err = e); m.RunPendingForTests();
+            Check(err == null && src.Written.Count == 5 && src.Reads == 3, "lighting: 5 reports, 3 read-backs");
+            Check(src.Written[1][1] == 0x13 && src.Written[2][0] == 11 && src.Written[2][11] == 1 && src.Written[4][1] == 0xF0, "lighting: start, data (Rolling, direction 1), finish");
+
+            // cable unplugged, plugged in with clock sync off
+            src.Cable = false; m.ScanForTests(); m.RunPendingForTests();
+            Check(!m.Snapshot().CanConfigure && src.Closed == 1, "cable out: settings channel closed");
+            settings.AulaClockSync = false; src.Written.Clear();
+            src.Cable = true; m.ScanForTests(); m.RunPendingForTests();
+            Check(m.Snapshot().CanConfigure && src.Written.Count == 0, "clock sync switched off: nothing written on plug-in");
+
+            // a failed write closes the channel and reports it
+            src.FailWrites = true;
+            m.SyncClock(e => err = e); m.RunPendingForTests();
+            st = m.Snapshot();
+            Check(err != null && !st.CanConfigure && st.LastError != "" && src.Closed == 2, "failed write: error shown, channel closed to reopen: " + err);
+
+            // keyboard gone entirely
+            src.FailWrites = false; src.Cable = false; src.Dongle = false;
+            m.ScanForTests(); m.RunPendingForTests();
+            Check(!m.Snapshot().Present && src.Listening == 0, "nothing plugged in: not present, listener closed");
+
+            // settings: the Aula fields survive a save and load; old files get clock sync on
+            settings.AulaLight = new AulaLighting { Mode = 7, R = 10, G = 20, B = 30, Rainbow = true, Brightness = 2, Speed = 1 };
+            settings.AulaClockSync = false;
+            var back = AppSettings.Deserialize(AppSettings.Serialize(settings));
+            Check(back.AulaLight != null && back.AulaLight.Mode == 7 && back.AulaLight.B == 30 && back.AulaLight.Rainbow && !back.AulaClockSync, "Aula settings round-trip");
+            var old = AppSettings.Deserialize("{\"Version\":2,\"Profiles\":[]}");
+            old.Normalize();
+            Check(old.AulaClockSync && old.AulaLight == null, "settings from 2.3.3: clock sync on, lighting untouched");
+            m.Dispose();
         }
 
         static void Misc()

@@ -48,8 +48,8 @@ namespace LiteOptions.SettingsApp
                 log.Add("settings round trip: identical");
 
                 // every page builds and lays out
-                foreach (var tag in new[] { "keys", "apps", "alerts", "settings", "mouse" }) { w.ShowPage(tag); await Task.Delay(400); }
-                log.Add("pages: mouse, keyboard, app profiles, pop-ups & alerts, settings shown");
+                foreach (var tag in new[] { "keys", "aula", "apps", "alerts", "settings", "mouse" }) { w.ShowPage(tag); await Task.Delay(400); }
+                log.Add("pages: mouse, keyboard, Aula F108 Pro, app profiles, pop-ups & alerts, settings shown");
 
                 // the search box finds settings on other pages and goes to them
                 w.ShowSearch("smooth");
@@ -147,6 +147,8 @@ namespace LiteOptions.SettingsApp
             w.ShowPage("keys"); await snap("03-keyboard");
             w.ScrollTo(480); await snap("03b-keyboard-middle");
             w.ScrollToEnd(); await snap("04-keyboard-lower");
+            w.ShowPage("aula"); await snap("04b-aula");
+            w.ScrollToEnd(); await snap("04c-aula-lower");
             w.ShowPage("settings"); await snap("05-settings");
             w.ScrollToEnd(); await snap("06-settings-lower");
             w.ShowPage("apps"); await snap("19-apps");

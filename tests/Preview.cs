@@ -28,7 +28,9 @@ namespace LiteOptions.Tests
             src.Add("BTLE_MOUSE", 0xB03E, ml, "Pebble Mouse 2 M350s");
             src.Add("BT_K380", 0xB342, kl, "Keyboard K380");
 
-            var app = new TrayApp(true, src, false);
+            var app = new TrayApp(true, src, false, null, new FakeAulaSource { Cable = true });
+            app.Aula.DelayMs = 0;
+            app.Settings.AulaLight = new AulaLighting { Mode = 11, R = 255, G = 110, B = 0, Brightness = 4, Speed = 2 };
             app.Settings.Global.MiddleMode = args.Length > 1 ? args[1] : "gestures";
             app.Settings.Global.Keys.Add(new KeyBinding { Vk = 0xB3, Action = ActionSpec.Of("calc") });
             app.Settings.Global.Keys.Add(new KeyBinding { Mods = 3, Vk = 0x56, Action = ActionSpec.Of("paste_plain") });
@@ -47,14 +49,15 @@ namespace LiteOptions.Tests
                 {
                     case 0: f.ClientSize = new Size(1040, 1380); f.ReloadAll(); f.ShowPageByName("mouse"); break;
                     case 1: Snap(f, outDir, "1-mouse"); f.ShowPageByName("keys"); break;
-                    case 2: Snap(f, outDir, "2-keyboard"); f.ShowPageByName("settings"); break;
-                    case 3: Snap(f, outDir, "3-settings"); app.Settings.Global.MiddleMode = "action"; app.Settings.Global.MiddleAction = new ActionSpec { Kind = "keys", Mods = 9, Vk = 0x56 }; f.ReloadAll(); f.ShowPageByName("mouse"); break;
-                    case 4: Snap(f, outDir, "4-mouse-action"); dlg = new InstallDialog(new Version(1, 0, 0), @"C:\Dev\LiteOptions-1.0\LiteOptions.exe"); dlg.Show(); break;
-                    case 5: Snap(dlg, outDir, "5-install"); dlg.Close(); dlg = new ChooseActionDialog(3, 0x56, ActionSpec.Of("paste_plain"), () => null); dlg.Show(); break;
-                    case 6: Snap(dlg, outDir, "6-choose-action"); dlg.Close(); dlg = new SetupDialog(app); dlg.Show(); break;
-                    case 7: Snap(dlg, outDir, "7-setup-1"); dlg.Controls.OfType<Panel>().First(p => p.Dock == DockStyle.Bottom).Controls.OfType<FluentButton>().First(b => b.Text == "Next").PerformClick(); break;
-                    case 8: Snap(dlg, outDir, "8-setup-2"); dlg.Controls.OfType<Panel>().First(p => p.Dock == DockStyle.Bottom).Controls.OfType<FluentButton>().First(b => b.Text == "Next").PerformClick(); break;
-                    case 9: Snap(dlg, outDir, "9-setup-3"); dlg.Close();
+                    case 2: Snap(f, outDir, "2-keyboard"); f.ReloadAll(); f.ShowPageByName("aula"); break;
+                    case 3: Snap(f, outDir, "2b-aula"); f.ShowPageByName("settings"); break;
+                    case 4: Snap(f, outDir, "3-settings"); app.Settings.Global.MiddleMode = "action"; app.Settings.Global.MiddleAction = new ActionSpec { Kind = "keys", Mods = 9, Vk = 0x56 }; f.ReloadAll(); f.ShowPageByName("mouse"); break;
+                    case 5: Snap(f, outDir, "4-mouse-action"); dlg = new InstallDialog(new Version(1, 0, 0), @"C:\Dev\LiteOptions-1.0\LiteOptions.exe"); dlg.Show(); break;
+                    case 6: Snap(dlg, outDir, "5-install"); dlg.Close(); dlg = new ChooseActionDialog(3, 0x56, ActionSpec.Of("paste_plain"), () => null); dlg.Show(); break;
+                    case 7: Snap(dlg, outDir, "6-choose-action"); dlg.Close(); dlg = new SetupDialog(app); dlg.Show(); break;
+                    case 8: Snap(dlg, outDir, "7-setup-1"); dlg.Controls.OfType<Panel>().First(p => p.Dock == DockStyle.Bottom).Controls.OfType<FluentButton>().First(b => b.Text == "Next").PerformClick(); break;
+                    case 9: Snap(dlg, outDir, "8-setup-2"); dlg.Controls.OfType<Panel>().First(p => p.Dock == DockStyle.Bottom).Controls.OfType<FluentButton>().First(b => b.Text == "Next").PerformClick(); break;
+                    case 10: Snap(dlg, outDir, "9-setup-3"); dlg.Close();
                         foreach (var (k, dark, name) in new[] { (1.5f, false, "light"), (1.5f, true, "dark") })
                         {
                             using (var b = Osd.Render(k, "\uE765", "F1–F12 keys first", "Hold Fn for media keys", null, dark)) b.Save(Path.Combine(outDir, "osd-fn-" + name + ".png"));

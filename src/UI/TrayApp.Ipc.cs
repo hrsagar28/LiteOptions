@@ -58,7 +58,22 @@ namespace LiteOptions.UI
         void BroadcastSettings() => server?.Broadcast(new IpcMessage { Event = "settings", Settings = Settings });
         void BroadcastDevices() => server?.Broadcast(new IpcMessage { Event = "devices", Devices = DeviceDtos() });
 
-        System.Collections.Generic.List<DeviceDto> DeviceDtos() => Devices.Snapshot().Select(d => new DeviceDto
+        System.Collections.Generic.List<DeviceDto> DeviceDtos()
+        {
+            var list = LogiDtos();
+            var a = Aula.Snapshot();
+            if (a.Present)
+                list.Add(new DeviceDto
+                {
+                    Key = "aula", Name = "Aula F108 Pro", Kind = "Aula", Connection = a.Connection, Online = true,
+                    Pid = a.Connection == "USB cable" ? AulaProtocol.CablePid : AulaProtocol.DonglePid,
+                    Firmware = a.Version == 0 ? "" : "v" + a.Version.ToString("X4"), CanConfigure = a.CanConfigure, LastError = a.LastError ?? "",
+                    ClockSynced = a.ClockSyncedAt == null ? "" : a.ClockSyncedAt.Value.ToString(a.ClockSyncedAt.Value.Date == DateTime.Today ? "'today at' HH:mm" : "d MMM 'at' HH:mm"),
+                });
+            return list;
+        }
+
+        System.Collections.Generic.List<DeviceDto> LogiDtos() => Devices.Snapshot().Select(d => new DeviceDto
         {
             Key = d.Key, Name = d.Name ?? "", Kind = d.Kind.ToString(), Connection = d.Connection ?? "", Pid = d.Pid, Online = d.Online,
             Firmware = d.Firmware ?? "", HasBattery = d.Battery != null, BatteryPercent = d.Battery?.Percent ?? -1, BatteryLevel = d.Battery?.Level ?? "",
@@ -163,6 +178,18 @@ namespace LiteOptions.UI
                     return new IpcMessage { Ok = true, Text = DiagnosticsText() };
 
                 case "toggleFn": ToggleFn(); return ok;
+
+                case "aulaLight":
+                    // the window saves the chosen lighting first; only an explicit change here writes it to the keyboard
+                    if (Settings.AulaLight == null) return new IpcMessage { Error = "no lighting chosen" };
+                    if (!Aula.Snapshot().CanConfigure) return new IpcMessage { Error = "Plug the keyboard in with its USB cable to change the lighting." };
+                    Aula.SetLighting(Settings.AulaLight);
+                    return ok;
+
+                case "aulaClock":
+                    if (!Aula.Snapshot().CanConfigure) return new IpcMessage { Error = "Plug the keyboard in with its USB cable to set its clock." };
+                    Aula.SyncClock();
+                    return ok;
 
                 case "uninstall":
                     try { Process.Start(new ProcessStartInfo(Application.ExecutablePath, "--uninstall --confirmed") { UseShellExecute = false })?.Dispose(); }

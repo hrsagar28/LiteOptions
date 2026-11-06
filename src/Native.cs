@@ -165,6 +165,8 @@ namespace LiteOptions
         [DllImport("hid.dll")] public static extern bool HidD_FreePreparsedData(IntPtr preparsed);
         [DllImport("hid.dll")] public static extern int HidP_GetCaps(IntPtr preparsed, out HIDP_CAPS caps);
         [DllImport("hid.dll", SetLastError = true)] public static extern bool HidD_GetProductString(IntPtr device, byte[] buffer, int bufferLength);
+        [DllImport("hid.dll", SetLastError = true)] public static extern bool HidD_SetFeature(IntPtr device, byte[] buffer, int bufferLength);
+        [DllImport("hid.dll", SetLastError = true)] public static extern bool HidD_GetFeature(IntPtr device, byte[] buffer, int bufferLength);
 
         [DllImport("setupapi.dll", SetLastError = true)]
         public static extern IntPtr SetupDiGetClassDevs(ref Guid classGuid, IntPtr enumerator, IntPtr hwndParent, int flags);

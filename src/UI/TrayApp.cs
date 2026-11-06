@@ -29,6 +29,7 @@ namespace LiteOptions.UI
 
         public AppSettings Settings;
         public readonly DeviceManager Devices;
+        public readonly AulaManager Aula;
         public readonly InputHooks Hooks;
         readonly SynchronizationContext ui;
         readonly NotifyIcon tray;
@@ -42,7 +43,7 @@ namespace LiteOptions.UI
 
         readonly bool live;
 
-        public TrayApp(bool showWindow, IDeviceSource source, bool live, string welcome = null)
+        public TrayApp(bool showWindow, IDeviceSource source, bool live, string welcome = null, IAulaSource aulaSource = null)
         {
             this.live = live;
             Theme.Init();
@@ -74,6 +75,8 @@ namespace LiteOptions.UI
 
             Devices = new DeviceManager(source, () => Settings);
             Devices.Changed += () => ui.Post(_ => OnDevicesChanged(), null);
+            Aula = new AulaManager(aulaSource ?? (live ? new WinAulaSource() : null), () => Settings);
+            Aula.Changed += () => ui.Post(_ => OnDevicesChanged(), null);
 
             if (live)
             {
@@ -82,6 +85,7 @@ namespace LiteOptions.UI
                 StartIpc();
             }
             Devices.Start();
+            Aula.Start();
 
             if (live) try { SystemTweaks.FixStartupPath(); } catch { }
             bool firstRun = !Settings.FirstRunDone;
@@ -221,6 +225,10 @@ namespace LiteOptions.UI
                           $" | DPI {(d.Dpi != null ? d.Dpi.Current + $" ({d.Dpi.Min}-{d.Dpi.Max} step {d.Dpi.Step})" : "n/a")}" +
                           $" | Fn swap {(d.FnSupported ? (d.FnMedia == true ? "media-first" : d.FnMedia == false ? "F-keys-first" : "?") : "n/a")}" +
                           $"{(d.Firmware != null ? " | fw " + d.Firmware : "")}{(d.LastError != null ? " | last error: " + d.LastError : "")}");
+            var a = Aula.Snapshot();
+            lines.Add(a.Present
+                ? $"Aula F108 Pro: {a.Connection} | v{a.Version:X4} | settings {(a.CanConfigure ? "open" : "closed")} | clock {(a.ClockSyncedAt?.ToString("yyyy-MM-dd HH:mm") ?? "not set")}{(a.LastError != "" ? " | last error: " + a.LastError : "")}"
+                : "Aula F108 Pro: not found");
             lines.Add("");
             lines.Add("Logitech HID collections:");
             lines.AddRange(Devices.LastEnumeration.Select(l => "  " + l));
@@ -401,6 +409,7 @@ namespace LiteOptions.UI
             messages?.DestroyHandle();
             Hooks?.Dispose();
             Devices.Dispose();
+            Aula.Dispose();
             base.ExitThreadCore();
         }
 
@@ -431,7 +440,10 @@ namespace LiteOptions.UI
                 {
                     int ev = (int)m.WParam;
                     if (ev == Native.DBT_DEVICEARRIVAL || ev == Native.DBT_DEVICEREMOVECOMPLETE)
+                    {
                         app.Devices.RequestScan(1500);
+                        app.Aula.RequestScan(1500);
+                    }
                 }
                 else if (m.Msg == Native.WM_POWERBROADCAST)
                 {
@@ -443,6 +455,7 @@ namespace LiteOptions.UI
                         lastResume = DateTime.UtcNow;
                         app.Hooks?.Rehook();
                         app.Devices.RequestScan(5000);
+                        app.Aula.RequestScan(5000);
                     }
                 }
                 base.WndProc(ref m);

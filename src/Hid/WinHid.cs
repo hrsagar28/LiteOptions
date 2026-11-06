@@ -22,7 +22,8 @@ namespace LiteOptions.Hid
         public string Path;
         public ushort Vid, Pid;
         public ushort UsagePage, Usage;
-        public int InLen, OutLen;
+        public int InLen, OutLen, FeatureLen;
+        public ushort Version;
         public string Product;
         public string ParentId;
 
@@ -36,7 +37,7 @@ namespace LiteOptions.Hid
     /// <summary>Enumerates HID collections with SetupAPI.</summary>
     public static class HidEnumerator
     {
-        public static List<HidCollectionInfo> Enumerate(ushort vendorId)
+        public static List<HidCollectionInfo> Enumerate(ushort vendorId, Func<string, bool> pathFilter = null)
         {
             var list = new List<HidCollectionInfo>();
             Native.HidD_GetHidGuid(out Guid hidGuid);
@@ -69,6 +70,7 @@ namespace LiteOptions.Hid
                     string vidHex = vendorId.ToString("X4");
                     if (!up.Contains("VID_" + vidHex) && !up.Contains("VID&0002" + vidHex) && !up.Contains("VID&02" + vidHex) && !up.Contains(vidHex))
                         continue;
+                    if (pathFilter != null && !pathFilter(up)) continue;
 
                     var info = Query(path);
                     if (info == null || info.Vid != vendorId) continue;
@@ -101,7 +103,7 @@ namespace LiteOptions.Hid
             {
                 var attr = new Native.HIDD_ATTRIBUTES { Size = Marshal.SizeOf(typeof(Native.HIDD_ATTRIBUTES)) };
                 if (!Native.HidD_GetAttributes(h, ref attr)) return null;
-                var info = new HidCollectionInfo { Path = path, Vid = attr.VendorID, Pid = attr.ProductID };
+                var info = new HidCollectionInfo { Path = path, Vid = attr.VendorID, Pid = attr.ProductID, Version = attr.VersionNumber };
                 if (Native.HidD_GetPreparsedData(h, out IntPtr pp))
                 {
                     try
@@ -109,7 +111,7 @@ namespace LiteOptions.Hid
                         if (Native.HidP_GetCaps(pp, out Native.HIDP_CAPS caps) == 0x00110000) // HIDP_STATUS_SUCCESS
                         {
                             info.UsagePage = caps.UsagePage; info.Usage = caps.Usage;
-                            info.InLen = caps.InputReportByteLength; info.OutLen = caps.OutputReportByteLength;
+                            info.InLen = caps.InputReportByteLength; info.OutLen = caps.OutputReportByteLength; info.FeatureLen = caps.FeatureReportByteLength;
                         }
                     }
                     finally { Native.HidD_FreePreparsedData(pp); }
@@ -147,9 +149,9 @@ namespace LiteOptions.Hid
             reader.Start();
         }
 
-        public static WinHidCollection Open(HidCollectionInfo info)
+        public static WinHidCollection Open(HidCollectionInfo info, bool readOnly = false)
         {
-            IntPtr h = Native.CreateFile(info.Path, Native.GENERIC_READ | Native.GENERIC_WRITE,
+            IntPtr h = Native.CreateFile(info.Path, readOnly ? Native.GENERIC_READ : Native.GENERIC_READ | Native.GENERIC_WRITE,
                 Native.FILE_SHARE_READ | Native.FILE_SHARE_WRITE, IntPtr.Zero, Native.OPEN_EXISTING, Native.FILE_FLAG_OVERLAPPED, IntPtr.Zero);
             if (h == Native.INVALID_HANDLE_VALUE) return null;
             return new WinHidCollection(info, h);

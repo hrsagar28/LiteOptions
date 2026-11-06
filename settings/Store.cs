@@ -44,6 +44,7 @@ namespace LiteOptions.SettingsApp
 
         public DeviceDto Mouse => Devices.FirstOrDefault(d => d.Kind == "Mouse");
         public DeviceDto Keyboard => Devices.FirstOrDefault(d => d.Kind == "Keyboard");
+        public DeviceDto Aula => Devices.FirstOrDefault(d => d.Kind == "Aula");
 
         public Profile Current => Settings.Profiles.FirstOrDefault(p => p.App == (CurrentApp ?? "")) ?? Settings.Global;
 

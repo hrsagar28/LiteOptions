@@ -225,4 +225,55 @@ namespace LiteOptions.Tests
             return Entries.First(e => e.info.GroupKey == key && e.link != null).link;
         }
     }
+
+    /// <summary>A pretend Aula F108 Pro: cable and/or dongle collections, recording every feature report written.</summary>
+    sealed class FakeAulaSource : IAulaSource
+    {
+        public bool Cable, Dongle;
+        public bool FailWrites;
+        public readonly List<byte[]> Written = new List<byte[]>();
+        public int Reads, Opened, Closed, Listening, ListenOpened;
+        public readonly List<Action<byte[]>> Listeners = new List<Action<byte[]>>();
+
+        public List<HidCollectionInfo> Enumerate()
+        {
+            var l = new List<HidCollectionInfo>();
+            if (Cable)
+            {
+                l.Add(new HidCollectionInfo { Path = "cable-kbd", Vid = 0x0C45, Pid = 0x800A, UsagePage = 0x0001, Usage = 6, InLen = 9, Version = 0x0120 });
+                l.Add(new HidCollectionInfo { Path = "cable-cfg", Vid = 0x0C45, Pid = 0x800A, UsagePage = 0xFF13, Usage = 1, FeatureLen = 65, Version = 0x0120 });
+                l.Add(new HidCollectionInfo { Path = "cable-lcd", Vid = 0x0C45, Pid = 0x800A, UsagePage = 0xFF68, Usage = 1, OutLen = 4097, InLen = 65, Version = 0x0120 });
+            }
+            if (Dongle)
+            {
+                l.Add(new HidCollectionInfo { Path = "dongle-kbd", Vid = 0x05AC, Pid = 0x024F, UsagePage = 0x0001, Usage = 6, InLen = 9, Product = "F108Pro Dongle" });
+                l.Add(new HidCollectionInfo { Path = "dongle-vendor", Vid = 0x05AC, Pid = 0x024F, UsagePage = 0xFF00, Usage = 1, InLen = 33, FeatureLen = 65, Product = "F108Pro Dongle" });
+            }
+            return l;
+        }
+
+        public IAulaPort OpenConfig(HidCollectionInfo info)
+        {
+            Opened++;
+            return new Port(this);
+        }
+
+        public IDisposable Listen(HidCollectionInfo info, Action<byte[]> report)
+        {
+            ListenOpened++; Listening++;
+            Listeners.Add(report);
+            return new Gone(() => { Listening--; Listeners.Remove(report); });
+        }
+
+        sealed class Port : IAulaPort
+        {
+            readonly FakeAulaSource s;
+            public Port(FakeAulaSource s) { this.s = s; }
+            public bool SetFeature(byte[] payload) { if (s.FailWrites) return false; s.Written.Add((byte[])payload.Clone()); return true; }
+            public byte[] GetFeature() { s.Reads++; var r = new byte[64]; if (s.Written.Count > 0) Array.Copy(s.Written[s.Written.Count - 1], r, 3); r[3] = 1; return r; }
+            public void Dispose() => s.Closed++;
+        }
+
+        sealed class Gone : IDisposable { readonly Action a; public Gone(Action a) { this.a = a; } public void Dispose() => a(); }
+    }
 }

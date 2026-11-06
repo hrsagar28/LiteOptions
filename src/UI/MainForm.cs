@@ -9,7 +9,7 @@ using LiteOptions.Input;
 
 namespace LiteOptions.UI
 {
-    sealed class MainForm : Form
+    sealed partial class MainForm : Form
     {
         readonly TrayApp app;
         bool loading;
@@ -93,6 +93,7 @@ namespace LiteOptions.UI
             BuildShell();
             BuildMousePage();
             BuildKeysPage();
+            BuildAulaPage();
             BuildSettingsPage();
             ResumeLayout();
         }
@@ -100,7 +101,7 @@ namespace LiteOptions.UI
         /// <summary>Moved to a monitor with a different scale: rebuild the whole window at the new size, keeping its state.</summary>
         void Rebuild(int dpi)
         {
-            string pageName = pageKeys.Visible ? "keys" : pageSettings.Visible ? "settings" : "mouse";
+            string pageName = pageKeys.Visible ? "keys" : pageAula.Visible ? "aula" : pageSettings.Visible ? "settings" : "mouse";
             string profile = current?.App ?? "";
             SuspendLayout();
             dpiDebounce?.Dispose();
@@ -161,12 +162,15 @@ namespace LiteOptions.UI
             navSettings = new NavItem("Settings", Theme.IcSettings);
             navKeys = new NavItem("Keyboard", Theme.IcKeyboard);
             navMouse = new NavItem("Mouse", Theme.IcMouse);
+            navAula = new NavItem("Aula F108 Pro", Theme.IcKeyboard);
+            navAula.Click += (s, e) => ShowPage(pageAula);
             navMouse.Click += (s, e) => ShowPage(pageMouse);
             navKeys.Click += (s, e) => ShowPage(pageKeys);
             navSettings.Click += (s, e) => ShowPage(pageSettings);
             sideStatus = new SidebarStatus(app) { Dock = DockStyle.Bottom };
 
             sidebar.Controls.Add(navSettings);
+            sidebar.Controls.Add(navAula);
             sidebar.Controls.Add(navKeys);
             sidebar.Controls.Add(navMouse);
             sidebar.Controls.Add(brand);
@@ -187,9 +191,10 @@ namespace LiteOptions.UI
             header.Resize += (s, e) => place();
             profileBar.SizeChanged += (s, e) => place();
 
-            pageMouse = Page(); pageKeys = Page(); pageSettings = Page();
+            pageMouse = Page(); pageKeys = Page(); pageAula = Page(); pageSettings = Page();
             content.Controls.Add(pageMouse);
             content.Controls.Add(pageKeys);
+            content.Controls.Add(pageAula);
             content.Controls.Add(pageSettings);
             content.Controls.Add(header);
 
@@ -229,17 +234,18 @@ namespace LiteOptions.UI
         void ShowPage(Panel page)
         {
             SuspendLayout();
-            foreach (var p in new[] { pageMouse, pageKeys, pageSettings }) p.Visible = p == page;
+            foreach (var p in new[] { pageMouse, pageKeys, pageAula, pageSettings }) p.Visible = p == page;
             ResumeLayout();
             navMouse.Selected = page == pageMouse;
             navKeys.Selected = page == pageKeys;
+            navAula.Selected = page == pageAula;
             navSettings.Selected = page == pageSettings;
-            pageTitle.Text = page == pageMouse ? "Mouse" : page == pageKeys ? "Keyboard" : "Settings";
-            profileBar.Visible = page != pageSettings;
+            pageTitle.Text = page == pageMouse ? "Mouse" : page == pageKeys ? "Keyboard" : page == pageAula ? "Aula F108 Pro" : "Settings";
+            profileBar.Visible = page != pageSettings && page != pageAula;
             if (page == pageSettings) RefreshSettingsPage();
         }
 
-        internal void ShowPageByName(string name) => ShowPage(name == "keys" ? pageKeys : name == "settings" ? pageSettings : pageMouse);
+        internal void ShowPageByName(string name) => ShowPage(name == "keys" ? pageKeys : name == "aula" ? pageAula : name == "settings" ? pageSettings : pageMouse);
         internal void ReloadAll() { ReloadProfiles(current?.App ?? ""); RefreshDevices(); }
 
         // ───────────────────────── profiles ─────────────────────────
@@ -767,6 +773,7 @@ namespace LiteOptions.UI
         {
             var m = app.Devices.Mouse;
             var k = app.Devices.Keyboard;
+            RefreshAula();
             loading = true;
 
             Fill(mouseHero, m, "No mouse found", "Turn the mouse on, or pair it in Settings › Bluetooth & devices. Button remapping works either way.");

@@ -132,8 +132,10 @@ namespace LiteOptions.SettingsApp
             new DeviceDto { Key = "demo-kb", Name = "Keyboard K380", Kind = "Keyboard", Connection = "Bluetooth", Pid = 0xB342, Online = true,
                 HasBattery = true, BatteryPercent = -1, BatteryLevel = "Good", FnSupported = true, FnMedia = 0, DisableCaps = 0x1D, DisabledKeys = 0x10,
                 CurrentHost = 1, Hosts = new List<HostDto> { new HostDto { Number = 1 }, new HostDto { Number = 2, Paired = true, Name = "WORK-LAPTOP" }, new HostDto { Number = 3, Paired = true, Name = "iPhone" } } },
+            new DeviceDto { Key = "aula", Name = "Aula F108 Pro", Kind = "Aula", Connection = "USB cable", Pid = 0x800A, Online = true, Firmware = "v0120",
+                CanConfigure = true, ClockSynced = "today at 16:05" },
         };
-        readonly SystemDto system = new SystemDto { Version = "2.3.3", Installed = true, PointerSpeed = 10, Precision = true, WheelLines = 3, Startup = true, ReverseScroll = 0, Architecture = RuntimeInformation.ProcessArchitecture.ToString() };
+        readonly SystemDto system = new SystemDto { Version = "2.4.0", Installed = true, PointerSpeed = 10, Precision = true, WheelLines = 3, Startup = true, ReverseScroll = 0, Architecture = RuntimeInformation.ProcessArchitecture.ToString() };
 
         public bool Connected { get; private set; }
         public event Action<bool> ConnectionChanged;
@@ -151,6 +153,7 @@ namespace LiteOptions.SettingsApp
             settings.FnMode = "standard";
             settings.MouseDpi = 1000;
             settings.SetupDone = true;
+            settings.AulaLight = new AulaLighting { Mode = 7, R = 255, G = 110, B = 0, Brightness = 4, Speed = 2 };
             settings.FirstRunDone = true;
             var excel = new Profile { App = "excel.exe", MiddleMode = "action", MiddleAction = ActionSpec.Keys((int)Mods.Ctrl, 0x22) };
             excel.Normalize();
@@ -189,6 +192,8 @@ namespace LiteOptions.SettingsApp
                     Task.Delay(1100).ContinueWith(_ => dq.TryEnqueue(() =>
                         Pushed?.Invoke(new IpcMessage { Event = "captured", Mods = (int)Mods.Ctrl | (int)Mods.Shift, Vk = 0x56 })));
                     break;
+                case "aulaLight": break;
+                case "aulaClock": devices[2].ClockSynced = "today at " + DateTime.Now.ToString("HH:mm"); break;
                 case "setPointerSpeed": system.PointerSpeed = m.Value; break;
                 case "setPrecision": system.Precision = m.On; break;
                 case "setWheelLines": system.WheelLines = m.Value; break;

@@ -232,6 +232,12 @@ jobs:
 
             Double-click it to install or update (your settings are kept). Windows may say "Windows protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
 
+            New in 2.4: Aula F108 Pro
+            - A page for the Aula F108 Pro mechanical keyboard, in place of Aula's own app: backlight effect, colour or rainbow, brightness, speed and direction.
+            - Sets the keyboard's screen clock whenever its USB-C cable is plugged in (can be switched off), or with "Set it now".
+            - The keyboard takes these changes only over its cable. On the 2.4 GHz dongle LiteOptions only listens: it notes what the dongle reports so a later version can show the battery level. It never writes to the dongle.
+            - Uses only the commands that the open-source f108-pro tool decoded from Aula's app and tested on the keyboard.
+
             Fixed in 2.3.3:
             - Pop-ups are more see-through: the colours of the wallpaper and windows behind show through the frosted glass.
             - Windows SmartScreen no longer asks every time LiteOptions starts, only once when you run a newly downloaded installer. (The installed copy kept the installer's "downloaded from the internet" mark.)

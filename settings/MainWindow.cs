@@ -24,7 +24,7 @@ namespace LiteOptions.SettingsApp
         readonly Store store;
         readonly Grid root, titleRow;
         readonly NavigationView nav;
-        readonly NavigationViewItem navMouse, navKeys, navApps, navAlerts, navSettings;
+        readonly NavigationViewItem navMouse, navKeys, navAula, navApps, navAlerts, navSettings;
         readonly TextBlock pageTitle;
         readonly DropDownButton profileButton;
         readonly TextBlock profileText;
@@ -48,6 +48,7 @@ namespace LiteOptions.SettingsApp
         const double ContentMaxWidth = 1000;
         internal readonly MousePage MousePage;
         internal readonly KeyboardPage KeysPage;
+        internal readonly AulaPage AulaPage;
         internal readonly AppsPage AppsPage;
         internal readonly AlertsPage AlertsPage;
         internal readonly SettingsPage SettingsPage;
@@ -121,6 +122,7 @@ namespace LiteOptions.SettingsApp
             // ── pages ──
             MousePage = new MousePage(store);
             KeysPage = new KeyboardPage(store);
+            AulaPage = new AulaPage(store);
             AppsPage = new AppsPage(store);
             AlertsPage = new AlertsPage(store);
             SettingsPage = new SettingsPage(store) { RunSetup = () => SetupFlow.RunAsync(store) };
@@ -193,6 +195,7 @@ namespace LiteOptions.SettingsApp
             // ── navigation: the devices with their battery rings, then the pages ──
             navMouse = Item("Mouse", Glyph.Mouse, "mouse");
             navKeys = Item("Keyboard", Glyph.Keyboard, "keys");
+            navAula = Item("Aula F108 Pro", Glyph.Keyboard, "aula");
             navApps = Item("App profiles", Glyph.Apps, "apps");
             navAlerts = Item("Pop-ups & alerts", Glyph.Alert, "alerts");
             navSettings = Item("Settings", Glyph.Settings, "settings");
@@ -210,6 +213,7 @@ namespace LiteOptions.SettingsApp
             };
             nav.MenuItems.Add(navMouse);
             nav.MenuItems.Add(navKeys);
+            nav.MenuItems.Add(navAula);
             nav.MenuItems.Add(navApps);
             nav.MenuItems.Add(navAlerts);
             nav.FooterMenuItems.Add(navSettings);
@@ -225,7 +229,7 @@ namespace LiteOptions.SettingsApp
 
             pages = new (string, PageBase, NavigationViewItem)[]
             {
-                ("mouse", MousePage, navMouse), ("keys", KeysPage, navKeys), ("apps", AppsPage, navApps),
+                ("mouse", MousePage, navMouse), ("keys", KeysPage, navKeys), ("aula", AulaPage, navAula), ("apps", AppsPage, navApps),
                 ("alerts", AlertsPage, navAlerts), ("settings", SettingsPage, navSettings),
             };
             foreach (var p in pages) p.page.Navigate = Navigate;
@@ -337,9 +341,40 @@ namespace LiteOptions.SettingsApp
             if (store.Loaded) Reveal();
             MousePage.LoadDevices();
             KeysPage.LoadDevices();
+            AulaPage.LoadDevices();
             devicePanel.Children.Clear();
             devicePanel.Children.Add(DeviceRow(store.Mouse, true));
             devicePanel.Children.Add(DeviceRow(store.Keyboard, false));
+            if (store.Aula != null) devicePanel.Children.Add(AulaRow(store.Aula));
+        }
+
+        /// <summary>The Aula in the menu, shown only while it's plugged in (cable or dongle). No battery ring: it doesn't report one yet.</summary>
+        FrameworkElement AulaRow(DeviceDto d)
+        {
+            var badge = new Border
+            {
+                Width = 44, Height = 44, CornerRadius = new CornerRadius(22),
+                Background = Ui.Brush("SubtleFillColorSecondaryBrush"),
+                Child = new FontIcon { Glyph = Glyph.Keyboard, FontSize = 20 },
+            };
+            string state = d.Connection == "USB cable" ? "Cable · Connected" : "Dongle";
+            var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 0 };
+            texts.Children.Add(new TextBlock { Text = d.Name, Style = Ui.Style("BodyStrongTextBlockStyle"), TextTrimming = TextTrimming.CharacterEllipsis });
+            texts.Children.Add(new TextBlock { Text = state, Style = Ui.Style("Secondary"), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap });
+            var g = new Grid { ColumnSpacing = 12 };
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            Grid.SetColumn(texts, 1);
+            g.Children.Add(badge);
+            g.Children.Add(texts);
+            var b = new Button
+            {
+                Content = g, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                Padding = new Thickness(8, 6, 8, 6), Background = new SolidColorBrush(Colors.Transparent), BorderThickness = new Thickness(0),
+            };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(b, d.Name + ", " + state);
+            b.Click += (s, e) => { ShowPage("aula"); if (narrow) nav.IsPaneOpen = false; };
+            return b;
         }
 
         /// <summary>A device in the menu: its photo in a battery ring, its name and state. Clicking it opens its page.</summary>

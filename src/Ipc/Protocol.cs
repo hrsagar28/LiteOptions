@@ -36,7 +36,7 @@ namespace LiteOptions.Ipc
     {
         [DataMember] public string Key = "";
         [DataMember] public string Name = "";
-        [DataMember] public string Kind = "Other";      // Mouse | Keyboard | Other
+        [DataMember] public string Kind = "Other";      // Mouse | Keyboard | Aula | Other
         [DataMember] public string Connection = "";
         [DataMember] public int Pid;
         [DataMember] public bool Online;
@@ -54,6 +54,8 @@ namespace LiteOptions.Ipc
         [DataMember] public int CurrentHost = -1;        // 0-based
         [DataMember] public int DisableCaps;             // keys the keyboard can switch off itself (bit mask); 0 = none
         [DataMember] public int DisabledKeys = -1;       // switched off right now; -1 unknown
+        [DataMember] public bool CanConfigure;           // Aula: on the cable, so lighting and the clock can be changed
+        [DataMember] public string ClockSynced = "";     // Aula: when the screen clock was last set, as text
 
         public string BatteryText => !HasBattery ? "" : BatteryPercent >= 0 ? BatteryPercent + "%" : BatteryLevel;
     }
