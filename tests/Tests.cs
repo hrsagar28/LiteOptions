@@ -35,6 +35,7 @@ namespace LiteOptions.Tests
                 CaptureLogic();
                 V12();
                 AulaFlow();
+                AulaSystemFlow();
                 Misc();
             }
             catch (Exception ex) { failed++; Console.WriteLine("CRASH " + ex); }
@@ -635,6 +636,46 @@ namespace LiteOptions.Tests
             var old = AppSettings.Deserialize("{\"Version\":2,\"Profiles\":[]}");
             old.Normalize();
             Check(old.AulaClockSync && old.AulaLight == null, "settings from 2.3.3: clock sync on, lighting untouched");
+            m.Dispose();
+        }
+
+        static void AulaSystemFlow()
+        {
+            Section("Aula F108 Pro system settings (pretend keyboard)");
+            var sys = new AulaSystemSettings { Sleep = 3, Response = 4, BlockWin = true, BlockAltTab = true };
+            var d = AulaProtocol.SystemData(sys);
+            Check(d[0] == 0 && d[1] == 1 && d[2] == 1 && d[3] == 0 && d[4] == 1 && d[5] == 0 && d[6] == 3 && d[7] == 0 && d[8] == 4 && d[62] == 0xAA && d[63] == 0x55,
+                "cable settings data: 00 01, Win, Alt+F4, Alt+Tab, Fn, sleep, -, response, AA 55 at 62");
+            var st = AulaProtocol.SystemStart();
+            Check(st[0] == 4 && st[1] == 0x17 && st[2] == 1 && st[8] == 1, "cable settings header 04 17 with bytes 2 and 8 set");
+            var seq = AulaProtocol.SystemSequence(sys);
+            Check(seq.Count == 4 && seq[0].readBack && seq[1].readBack && !seq[2].readBack && seq[3].readBack && seq[3].data[1] == 0x02, "cable settings: begin, header, data (no read-back), apply");
+            var r = AulaProtocol.DongleSystem(sys);
+            Check(r.Length == 33 && r[1] == 7 && r[2] == 0x10 && r[3] == 0 && r[5] == 1 && r[6] == 1 && r[7] == 0 && r[8] == 1 && r[9] == 0 && r[10] == 3 && r[12] == 4
+                  && r[18] == 0xAA && r[19] == 0x55 && AulaProtocol.ChecksumOk(r), "dongle settings: 07 10, fields from byte 5, AA 55 at 18, checksum");
+            var odd = new AulaSystemSettings { Sleep = 9, Response = 0, FnSwitch = 5 }; odd.Normalize();
+            Check(odd.Sleep == 3 && odd.Response == 1 && odd.FnSwitch == 0, "settings clamped to what the keyboard accepts");
+            var def = new AulaSystemSettings();
+            Check(def.Sleep == 2 && def.Response == 2 && !def.BlockWin && def.FnSwitch == 0, "defaults are the Aula app's: 5 minutes, level 2, nothing blocked");
+
+            var settings = new AppSettings(); settings.Normalize();
+            var src = new FakeAulaSource { Dongle = true, OnDongle = true };
+            var m = new AulaManager(src, () => settings) { DelayMs = 0, EchoTimeoutMs = 1 };
+            settings.AulaClockSync = false;
+            m.ScanForTests(); m.RunPendingForTests();
+            src.DongleWritten.Clear();
+            string err = "x";
+            m.SetSystem(sys, e => err = e); m.RunPendingForTests();
+            Check(err == null && src.DongleWritten.Count == 1 && src.DongleWritten[0][1] == 7, "settings through the dongle: one report, echoed");
+            src.Cable = true; m.ScanForTests(); m.RunPendingForTests();
+            src.Written.Clear(); src.Reads = 0; err = "x";
+            m.SetSystem(sys, e => err = e); m.RunPendingForTests();
+            Check(err == null && src.Written.Count == 4 && src.Reads == 3 && src.Written[1][1] == 0x17 && src.Written[2][6] == 3, "settings over the cable: 4 reports, 3 read-backs");
+            Check(Logger.Snapshot().Contains("settings sent (sleep after 30 minutes, key response level 4, blocking Windows key, Alt+Tab)"), "settings logged");
+
+            settings.AulaSystem = sys;
+            var back = AppSettings.Deserialize(AppSettings.Serialize(settings));
+            Check(back.AulaSystem != null && back.AulaSystem.Sleep == 3 && back.AulaSystem.Response == 4 && back.AulaSystem.BlockWin && !back.AulaSystem.BlockAltF4, "system settings round-trip");
             m.Dispose();
         }
 

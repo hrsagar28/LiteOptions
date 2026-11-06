@@ -37,7 +37,12 @@ namespace LiteOptions.SettingsApp
         readonly ColorPicker picker;
         readonly Button syncNow;
         readonly Debouncer send = new Debouncer(350);
+        readonly Debouncer sendSystem = new Debouncer(500);
+        readonly SettingsGroup sysGroup;
+        readonly ComboBox sleepBox, responseBox;
+        readonly ToggleSwitch blockWin, blockAltF4, blockAltTab;
         AulaLighting light = new AulaLighting { Mode = 1 };
+        AulaSystemSettings sys = new AulaSystemSettings();
 
         public override string Title => "Aula F108 Pro";
         public override bool UsesProfiles => false;
@@ -101,6 +106,24 @@ namespace LiteOptions.SettingsApp
             dirCard = lightGroup.Add(new SettingCard(Glyph.Swap, "Direction", "", new Grid { Children = { dirLR, dirUD } }));
 
             // ── clock ──
+            // ── keyboard settings (the Aula app's "System Settings"): all sent together ──
+            Section("Keyboard", Note("The keyboard can't report these; shown as last set here"));
+            sysGroup = Group();
+            sleepBox = new ComboBox { MinWidth = 200, ItemsSource = AulaSystemSettings.SleepNames.ToList() };
+            sleepBox.SelectionChanged += (s, e) => { if (loading || sleepBox.SelectedIndex < 0) return; sys.Sleep = sleepBox.SelectedIndex; SystemChanged(); };
+            Find(sysGroup.Add(new SettingCard(Glyph.Power, "Sleep", "On battery, how long before it sleeps. It wakes with any key.", sleepBox)), "aula sleep time battery idle");
+            responseBox = new ComboBox { MinWidth = 200, ItemsSource = new[] { "Level 1 (quickest)", "Level 2", "Level 3", "Level 4", "Level 5 (steadiest)" }.ToList() };
+            responseBox.SelectionChanged += (s, e) => { if (loading || responseBox.SelectedIndex < 0) return; sys.Response = responseBox.SelectedIndex + 1; SystemChanged(); };
+            Find(sysGroup.Add(new SettingCard(Glyph.Keyboard, "Key response time",
+                "Level 2 is about 5-6 ms on the cable, 7-9 ms on the dongle and 15-16 ms on Bluetooth. Raise it if a key types twice.", responseBox)), "aula key response time debounce chatter delay");
+            blockWin = Ui.Toggle(); blockAltF4 = Ui.Toggle(); blockAltTab = Ui.Toggle();
+            blockWin.Toggled += (s, e) => { if (loading) return; sys.BlockWin = blockWin.IsOn; SystemChanged(); };
+            blockAltF4.Toggled += (s, e) => { if (loading) return; sys.BlockAltF4 = blockAltF4.IsOn; SystemChanged(); };
+            blockAltTab.Toggled += (s, e) => { if (loading) return; sys.BlockAltTab = blockAltTab.IsOn; SystemChanged(); };
+            Find(sysGroup.Add(new SettingCard(Glyph.Block, "Turn off the Windows key", "On this keyboard only", blockWin)), "aula windows key lock disable");
+            Find(sysGroup.Add(new SettingCard(Glyph.Block, "Turn off Alt+F4", "On this keyboard only", blockAltF4)), "aula alt f4 disable");
+            Find(sysGroup.Add(new SettingCard(Glyph.Block, "Turn off Alt+Tab", "On this keyboard only", blockAltTab)), "aula alt tab disable");
+
             // ── side lights and light bar: the keyboard only takes these from its own Fn shortcuts ──
             Section("Side lights and light bar", Note("Set on the keyboard only"));
             var fnGroup = Group();
@@ -163,6 +186,18 @@ namespace LiteOptions.SettingsApp
             });
         }
 
+        /// <summary>Save the whole set and send it once the choices have settled.</summary>
+        void SystemChanged()
+        {
+            store.Settings.AulaSystem = sys.Clone();
+            sendSystem.Run(async () =>
+            {
+                await store.SaveNowAsync();
+                var r = await store.Send("aulaSystem");
+                if (r.Error != null) ShowError(r.Error);
+            });
+        }
+
         async Task SyncNow()
         {
             syncNow.IsEnabled = false;
@@ -209,6 +244,11 @@ namespace LiteOptions.SettingsApp
             brightValue.Text = light.Brightness.ToString();
             speedValue.Text = light.Speed.ToString();
             sync.IsOn = s.AulaClockSync;
+            sys = s.AulaSystem?.Clone() ?? new AulaSystemSettings();
+            sys.Normalize();
+            sleepBox.SelectedIndex = sys.Sleep;
+            responseBox.SelectedIndex = sys.Response - 1;
+            blockWin.IsOn = sys.BlockWin; blockAltF4.IsOn = sys.BlockAltF4; blockAltTab.IsOn = sys.BlockAltTab;
             ShowColour();
             UpdateVisibility();
             loading = false;
@@ -237,6 +277,8 @@ namespace LiteOptions.SettingsApp
             cableNote.Shown = !cable;
             lightGroup.IsEnabled = cable;
             lightGroup.Opacity = cable ? 1 : 0.6;
+            sysGroup.IsEnabled = cable;
+            sysGroup.Opacity = cable ? 1 : 0.6;
             syncNow.IsEnabled = cable;
             syncCard.Description = d != null && d.ClockSynced != "" ? "Last set " + d.ClockSynced : "On the cable or the dongle; keeps the date and time on its screen right";
             if (d != null && d.LastError != "") ShowError(d.LastError);

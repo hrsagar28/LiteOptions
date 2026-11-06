@@ -232,6 +232,11 @@ jobs:
 
             Double-click it to install or update (your settings are kept). Windows may say "Windows protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
 
+            New in 2.6: Aula F108 Pro keyboard settings
+            - Sleep time (never, 1, 5 or 30 minutes), key response time (levels 1-5), and turning off the Windows key, Alt+F4 or Alt+Tab on the keyboard itself. Over the cable or the dongle.
+            - The Fn shortcuts for the side lights and the light bar, which the keyboard takes from nowhere else, are listed on the Aula page.
+            - Uses the "System Settings" command the Aula app sends; the keyboard can't report these, so the page shows what was last set in LiteOptions (the Aula app's defaults at first).
+
             New in 2.5: Aula F108 Pro on its 2.4 GHz dongle
             - Battery level through the dongle, with the ring, the tray badge and the low-battery warning. The last reading stays while the keyboard sleeps.
             - Lighting changes and "Set it now" for the clock work over the dongle as well as the cable; the screen clock is set when the keyboard connects (at most once an hour).

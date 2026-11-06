@@ -135,7 +135,7 @@ namespace LiteOptions.SettingsApp
             new DeviceDto { Key = "aula", Name = "Aula F108 Pro", Kind = "Aula", Connection = "USB cable", Pid = 0x800A, Online = true, Firmware = "v0120",
                 CanConfigure = true, ClockSynced = "today at 16:05", HasBattery = true, BatteryPercent = 64 },
         };
-        readonly SystemDto system = new SystemDto { Version = "2.5.0", Installed = true, PointerSpeed = 10, Precision = true, WheelLines = 3, Startup = true, ReverseScroll = 0, Architecture = RuntimeInformation.ProcessArchitecture.ToString() };
+        readonly SystemDto system = new SystemDto { Version = "2.6.0", Installed = true, PointerSpeed = 10, Precision = true, WheelLines = 3, Startup = true, ReverseScroll = 0, Architecture = RuntimeInformation.ProcessArchitecture.ToString() };
 
         public bool Connected { get; private set; }
         public event Action<bool> ConnectionChanged;
@@ -193,6 +193,7 @@ namespace LiteOptions.SettingsApp
                         Pushed?.Invoke(new IpcMessage { Event = "captured", Mods = (int)Mods.Ctrl | (int)Mods.Shift, Vk = 0x56 })));
                     break;
                 case "aulaLight": break;
+                case "aulaSystem": break;
                 case "aulaClock": devices[2].ClockSynced = "today at " + DateTime.Now.ToString("HH:mm"); break;
                 case "setPointerSpeed": system.PointerSpeed = m.Value; break;
                 case "setPrecision": system.Precision = m.On; break;

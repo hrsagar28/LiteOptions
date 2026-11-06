@@ -187,6 +187,12 @@ namespace LiteOptions.UI
                     Aula.SetLighting(Settings.AulaLight);
                     return ok;
 
+                case "aulaSystem":
+                    if (Settings.AulaSystem == null) return new IpcMessage { Error = "no settings chosen" };
+                    if (!Aula.Snapshot().CanConfigure) return new IpcMessage { Error = "Over Bluetooth the keyboard doesn't take changes. Switch it to 2.4G (the dongle) or plug in its USB-C cable." };
+                    Aula.SetSystem(Settings.AulaSystem);
+                    return ok;
+
                 case "aulaClock":
                     if (!Aula.Snapshot().CanConfigure) return new IpcMessage { Error = "Over Bluetooth the keyboard doesn't take changes. Switch it to 2.4G (the dongle) or plug in its USB-C cable." };
                     Aula.SyncClock();

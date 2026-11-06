@@ -22,6 +22,10 @@ namespace LiteOptions.UI
         Segmented aulaDir;
         FluentButton aulaSyncNow;
         AulaLighting aulaLight = new AulaLighting();
+        AulaSystemSettings aulaSys = new AulaSystemSettings();
+        DropDown aulaSleep, aulaResponse;
+        ToggleSwitch aulaBlockWin, aulaBlockAltF4, aulaBlockAltTab;
+        CardPanel aulaSysCard;
 
         static readonly (string name, Color c)[] AulaSwatches =
         {
@@ -90,6 +94,25 @@ namespace LiteOptions.UI
             aulaDirRow = aulaLightCard.Add(new SettingRow(null, "Direction", "", aulaDir));
             Add(pageAula, aulaLightCard);
 
+            Add(pageAula, UIx.Section("Keyboard (the keyboard can't report these; shown as last set here)"));
+            aulaSysCard = new CardPanel();
+            aulaSleep = new DropDown { Width = Theme.S(200) };
+            aulaSleep.SetItems(AulaSystemSettings.SleepNames.Select((n, i) => new KeyValuePair<string, object>(n, i)));
+            aulaSleep.Picked += v => { aulaSys.Sleep = (int)v; AulaSystemChanged(); };
+            aulaSysCard.Add(new SettingRow(Theme.IcSync, "Sleep", "On battery, how long before it sleeps. It wakes with any key.", aulaSleep));
+            aulaResponse = new DropDown { Width = Theme.S(200) };
+            aulaResponse.SetItems(Enumerable.Range(1, 5).Select(i => new KeyValuePair<string, object>(i == 1 ? "Level 1 (quickest)" : i == 5 ? "Level 5 (steadiest)" : "Level " + i, i)));
+            aulaResponse.Picked += v => { aulaSys.Response = (int)v; AulaSystemChanged(); };
+            aulaSysCard.Add(new SettingRow(Theme.IcKeyboard, "Key response time", "Level 2 is about 5-6 ms on the cable, 7-9 ms on the dongle. Raise it if a key types twice.", aulaResponse));
+            aulaBlockWin = new ToggleSwitch(); aulaBlockAltF4 = new ToggleSwitch(); aulaBlockAltTab = new ToggleSwitch();
+            aulaBlockWin.CheckedChanged += (s, e) => { if (loading) return; aulaSys.BlockWin = aulaBlockWin.Checked; AulaSystemChanged(); };
+            aulaBlockAltF4.CheckedChanged += (s, e) => { if (loading) return; aulaSys.BlockAltF4 = aulaBlockAltF4.Checked; AulaSystemChanged(); };
+            aulaBlockAltTab.CheckedChanged += (s, e) => { if (loading) return; aulaSys.BlockAltTab = aulaBlockAltTab.Checked; AulaSystemChanged(); };
+            aulaSysCard.Add(new SettingRow(null, "Turn off the Windows key", "On this keyboard only", aulaBlockWin));
+            aulaSysCard.Add(new SettingRow(null, "Turn off Alt+F4", "On this keyboard only", aulaBlockAltF4));
+            aulaSysCard.Add(new SettingRow(null, "Turn off Alt+Tab", "On this keyboard only", aulaBlockAltTab));
+            Add(pageAula, aulaSysCard);
+
             Add(pageAula, UIx.Section("Side lights and light bar (set on the keyboard only)"));
             var fn = new CardPanel();
             fn.Add(new SettingRow(Theme.IcBrightness, "Light bar above the arrow keys", "Effect Fn + Left Shift · Speed Fn + Left Ctrl · Brightness Fn + Left Alt · Colour Fn + Z", null));
@@ -118,6 +141,15 @@ namespace LiteOptions.UI
             app.Commit();
             if (!app.Aula.Snapshot().CanConfigure) { ShowAulaError("Over Bluetooth the keyboard doesn't take changes. Switch it to 2.4G (the dongle) or plug in its USB-C cable."); return; }
             app.Aula.SetLighting(app.Settings.AulaLight);
+        }
+
+        void AulaSystemChanged()
+        {
+            if (loading) return;
+            app.Settings.AulaSystem = aulaSys.Clone();
+            app.Commit();
+            if (!app.Aula.Snapshot().CanConfigure) { ShowAulaError("Over Bluetooth the keyboard doesn't take changes. Switch it to 2.4G (the dongle) or plug in its USB-C cable."); return; }
+            app.Aula.SetSystem(app.Settings.AulaSystem);
         }
 
         void ShowAulaError(string msg) { aulaError.Text2 = msg; aulaError.Visible = true; }
@@ -156,6 +188,11 @@ namespace LiteOptions.UI
             aulaBright.Value = aulaLight.Brightness; aulaBrightValue.Text = aulaLight.Brightness.ToString();
             aulaSpeed.Value = aulaLight.Speed; aulaSpeedValue.Text = aulaLight.Speed.ToString();
             aulaSync.Checked = app.Settings.AulaClockSync;
+            aulaSys = app.Settings.AulaSystem?.Clone() ?? new AulaSystemSettings();
+            aulaSys.Normalize();
+            aulaSleep.Select(aulaSys.Sleep);
+            aulaResponse.Select(aulaSys.Response);
+            aulaBlockWin.Checked = aulaSys.BlockWin; aulaBlockAltF4.Checked = aulaSys.BlockAltF4; aulaBlockAltTab.Checked = aulaSys.BlockAltTab;
             ShowAulaColour();
             UpdateAulaVisibility();
 
@@ -170,6 +207,7 @@ namespace LiteOptions.UI
             aulaCableNote.Visible = !a.CanConfigure;
             foreach (var r in new Control[] { aulaEffectRow, aulaColourRow, aulaRainbowRow, aulaBrightRow, aulaSpeedRow, aulaDirRow }) r.Enabled = a.CanConfigure;
             aulaSyncNow.Enabled = a.CanConfigure;
+            foreach (Control r in aulaSysCard.Controls) r.Enabled = a.CanConfigure;
             aulaSyncRow.Description = a.ClockSyncedAt != null ? "Last set " + a.ClockSyncedAt.Value.ToString("d MMM 'at' HH:mm") : "Keeps the date and time on its screen right";
             aulaError.Text2 = a.LastError ?? "";
             aulaError.Visible = !string.IsNullOrEmpty(a.LastError);

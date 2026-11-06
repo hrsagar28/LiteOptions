@@ -13,7 +13,7 @@ namespace LiteOptions.SettingsApp
     /// <summary>Segoe Fluent Icons code points.</summary>
     static class Glyph
     {
-        public const string Light = "\uEA80", Palette = "\uE790", Brightness = "\uE706", Clock = "\uE917";
+        public const string Block = "\uE8F8", Light = "\uEA80", Palette = "\uE790", Brightness = "\uE706", Clock = "\uE917";
         public const string Mouse = "", Keyboard = "", Settings = "", Up = "", Down = "", Left = "", Right = "",
             Touch = "", Edit = "", Add = "", Delete = "", Refresh = "", Copy = "", Folder = "",
             Power = "", Pause = "", Info = "", Warning = "", Check = "", Speed = "", Scroll = "",

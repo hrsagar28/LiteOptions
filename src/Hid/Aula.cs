@@ -92,6 +92,30 @@ namespace LiteOptions.Hid
             (Begin(), true), (LightingStart(), true), (Lighting(l), false), (Apply(), true), (Finish(), false),
         };
 
+        /// <summary>System Settings over the cable, as the Aula app sends them: 04 17 header, then one data packet
+        /// (00 01, Windows key, Alt+F4, Alt+Tab, Fn switch, sleep, -, key response; AA 55 at 62), no read-back after it.</summary>
+        public static byte[] SystemStart() { var p = Cmd(0x04, 0x17); p[2] = 0x01; p[8] = 0x01; return p; }
+
+        public static byte[] SystemData(AulaSystemSettings s)
+        {
+            var c = s.Clone(); c.Normalize();
+            var p = new byte[ReportSize];
+            p[1] = 0x01;
+            p[2] = (byte)(c.BlockWin ? 1 : 0);
+            p[3] = (byte)(c.BlockAltF4 ? 1 : 0);
+            p[4] = (byte)(c.BlockAltTab ? 1 : 0);
+            p[5] = (byte)c.FnSwitch;
+            p[6] = (byte)c.Sleep;
+            p[8] = (byte)c.Response;
+            p[62] = 0xAA; p[63] = 0x55;
+            return p;
+        }
+
+        public static List<(byte[] data, bool readBack)> SystemSequence(AulaSystemSettings s) => new List<(byte[], bool)>
+        {
+            (Begin(), true), (SystemStart(), true), (SystemData(s), false), (Apply(), true),
+        };
+
         public static List<(byte[] data, bool readBack)> ClockSequence(DateTime t) => new List<(byte[], bool)>
         {
             (Begin(), true), (ClockStart(), true), (Clock(t), true), (Apply(), true),
@@ -148,6 +172,23 @@ namespace LiteOptions.Hid
             return Checksum(r);
         }
 
+        /// <summary>System Settings through the dongle: 07 10, then the cable's fields four bytes on, AA 55 at 18.</summary>
+        public static byte[] DongleSystem(AulaSystemSettings s)
+        {
+            var c = s.Clone(); c.Normalize();
+            var r = new byte[DongleReportSize];
+            r[1] = 0x07; r[2] = 0x10;
+            r[5] = 0x01;
+            r[6] = (byte)(c.BlockWin ? 1 : 0);
+            r[7] = (byte)(c.BlockAltF4 ? 1 : 0);
+            r[8] = (byte)(c.BlockAltTab ? 1 : 0);
+            r[9] = (byte)c.FnSwitch;
+            r[10] = (byte)c.Sleep;
+            r[12] = (byte)c.Response;
+            r[18] = 0xAA; r[19] = 0x55;
+            return Checksum(r);
+        }
+
         static byte[] Dongle(byte a, byte b) { var r = new byte[DongleReportSize]; r[1] = a; r[2] = b; return Checksum(r); }
 
         public static byte[] Checksum(byte[] r)
@@ -180,7 +221,7 @@ namespace LiteOptions.Hid
 
         /// <summary>One of our own commands echoed back (not worth logging).</summary>
         public static bool IsKnownAnswer(byte[] r) =>
-            r != null && r.Length >= 3 && ((r[1] == 0x20 && r[2] == 0x01) || (r[1] == 0x05 && r[2] == 0x10) || (r[1] == 0x0C && r[2] == 0x10));
+            r != null && r.Length >= 3 && ((r[1] == 0x20 && r[2] == 0x01) || (r[1] == 0x05 && r[2] == 0x10) || (r[1] == 0x0C && r[2] == 0x10) || (r[1] == 0x07 && r[2] == 0x10));
     }
 
     public sealed class AulaState
@@ -486,6 +527,21 @@ namespace LiteOptions.Hid
                 if (port != null) err = Run(AulaProtocol.LightingSequence(copy), "lighting");
                 else err = SendDongle(AulaProtocol.DongleLighting(copy), "lighting");
                 if (err == null) Logger.Write($"Aula F108 Pro: lighting set to {copy.Describe()}{(port == null ? " (dongle)" : "")}");
+                Recompute();
+                RaiseChanged();
+                done?.Invoke(err);
+            });
+        }
+
+        /// <summary>Sleep time, key response and key blocking, over the cable or the dongle.</summary>
+        public void SetSystem(AulaSystemSettings s, Action<string> done = null)
+        {
+            if (s == null) { done?.Invoke("Nothing chosen"); return; }
+            var copy = s.Clone();
+            Post(() =>
+            {
+                string err = port != null ? Run(AulaProtocol.SystemSequence(copy), "settings") : SendDongle(AulaProtocol.DongleSystem(copy), "settings");
+                if (err == null) Logger.Write($"Aula F108 Pro: settings sent ({copy.Describe()}){(port == null ? " (dongle)" : "")}");
                 Recompute();
                 RaiseChanged();
                 done?.Invoke(err);
