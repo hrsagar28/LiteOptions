@@ -39,7 +39,7 @@ namespace LiteOptions.UI
 
             Add(pageAula, UIx.Section("Backlight"));
             aulaLightCard = new CardPanel();
-            aulaCableNote = aulaLightCard.Add(new NoteRow("The keyboard takes lighting changes only over its USB-C cable. Plug it in to change these."));
+            aulaCableNote = aulaLightCard.Add(new NoteRow("Over Bluetooth the keyboard doesn't take changes. Switch it to 2.4G (the dongle) or plug in its USB-C cable to change these."));
 
             aulaEffect = new DropDown { Width = Theme.S(240) };
             aulaEffect.SetItems(AulaLighting.Names.Select((n, i) => new KeyValuePair<string, object>(n, i)));
@@ -94,23 +94,22 @@ namespace LiteOptions.UI
             var clock = new CardPanel();
             aulaSync = new ToggleSwitch();
             aulaSync.CheckedChanged += (s, e) => { if (loading) return; app.Settings.AulaClockSync = aulaSync.Checked; app.Commit(); };
-            aulaSyncRow = clock.Add(new SettingRow(Theme.IcSync, "Set the clock when the cable is plugged in", "", aulaSync));
+            aulaSyncRow = clock.Add(new SettingRow(Theme.IcSync, "Set the clock when the keyboard connects", "", aulaSync));
             aulaSyncNow = new FluentButton("Set it now", ButtonKind.Standard, Theme.IcRefresh, (s, e) =>
             {
-                if (!app.Aula.Snapshot().CanConfigure) { ShowAulaError("Plug the keyboard in with its USB cable to set its clock."); return; }
+                if (!app.Aula.Snapshot().CanConfigure) { ShowAulaError("Over Bluetooth the keyboard doesn't take changes. Switch it to 2.4G (the dongle) or plug in its USB-C cable."); return; }
                 app.Aula.SyncClock();
             });
-            clock.Add(new SettingRow(null, "Set the clock to this PC's time now", "Needs the USB cable", aulaSyncNow));
+            clock.Add(new SettingRow(null, "Set the clock to this PC's time now", "Over the cable or the dongle", aulaSyncNow));
             Add(pageAula, clock);
 
-            Add(pageAula, NoteCard("Battery: on Bluetooth LiteOptions shows it and warns you when it's low. On the dongle it's still learning how the battery is reported; the keyboard's screen shows it meanwhile."));
         }
 
         void AulaChanged()
         {
             app.Settings.AulaLight = aulaLight.Clone();
             app.Commit();
-            if (!app.Aula.Snapshot().CanConfigure) { ShowAulaError("Plug the keyboard in with its USB cable to change the lighting."); return; }
+            if (!app.Aula.Snapshot().CanConfigure) { ShowAulaError("Over Bluetooth the keyboard doesn't take changes. Switch it to 2.4G (the dongle) or plug in its USB-C cable."); return; }
             app.Aula.SetLighting(app.Settings.AulaLight);
         }
 
@@ -156,10 +155,11 @@ namespace LiteOptions.UI
             var a = app.Aula.Snapshot();
             aulaStatus.Title.Text = a.Present ? "Aula F108 Pro" : "Aula F108 Pro: not found";
             aulaStatus.Description = !a.Present
-                ? "Plug in its 2.4 GHz dongle or its USB-C cable. LiteOptions can't see it over Bluetooth."
+                ? "Not connected. Switch it on, or plug in its 2.4 GHz dongle or USB-C cable."
                 : a.Connection == "USB cable" ? "Connected by USB cable" + (a.Version != 0 ? " · v" + a.Version.ToString("X4") : "")
-                : a.Connection == "Bluetooth" ? "Connected by Bluetooth" + (a.Battery >= 0 ? " · battery " + a.Battery + "%" : "") + ". Lighting and the clock change over the USB cable."
-                : "Dongle plugged in. Lighting and the clock change over the USB cable.";
+                : a.Connection == "Bluetooth" ? "Connected by Bluetooth" + (a.Battery >= 0 ? " · battery " + a.Battery + "%" : "")
+                : a.DongleAwake ? "Connected by 2.4 GHz dongle" + (a.Battery >= 0 ? " · battery " + a.Battery + "%" : "")
+                : "Dongle plugged in, but the keyboard isn't answering. Press a key to wake it, or check it's switched to 2.4G.";
             aulaCableNote.Visible = !a.CanConfigure;
             foreach (var r in new Control[] { aulaEffectRow, aulaColourRow, aulaRainbowRow, aulaBrightRow, aulaSpeedRow, aulaDirRow }) r.Enabled = a.CanConfigure;
             aulaSyncNow.Enabled = a.CanConfigure;

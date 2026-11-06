@@ -231,6 +231,13 @@ namespace LiteOptions.Tests
     {
         public bool Cable, Dongle;
         public bool FailWrites;
+        /// <summary>The keyboard is on the dongle and awake: it echoes commands and answers the battery query.</summary>
+        public bool OnDongle;
+        public int DongleBattery = 59;
+        public readonly List<byte[]> DongleWritten = new List<byte[]>();
+        public int DongleOpened, DongleClosed;
+        Action<byte[]> dongleReport;
+        public void DongleSends(byte[] r) => dongleReport?.Invoke(r);
         public int Bluetooth = -2;   // -2 not on Bluetooth; else its battery (-1 unknown)
         public BluetoothDeviceInfo FindBluetooth() => Bluetooth == -2 ? null : new BluetoothDeviceInfo { Name = "AULA-F108Pro-1", Battery = Bluetooth };
         public readonly List<byte[]> Written = new List<byte[]>();
@@ -249,7 +256,9 @@ namespace LiteOptions.Tests
             if (Dongle)
             {
                 l.Add(new HidCollectionInfo { Path = "dongle-kbd", Vid = 0x05AC, Pid = 0x024F, UsagePage = 0x0001, Usage = 6, InLen = 9, Product = "F108Pro Dongle" });
-                l.Add(new HidCollectionInfo { Path = "dongle-vendor", Vid = 0x05AC, Pid = 0x024F, UsagePage = 0xFF00, Usage = 1, InLen = 33, FeatureLen = 65, Product = "F108Pro Dongle" });
+                l.Add(new HidCollectionInfo { Path = "dongle-ffff", Vid = 0x05AC, Pid = 0x024F, UsagePage = 0xFFFF, Usage = 1, InLen = 4, Product = "F108Pro Dongle" });
+                l.Add(new HidCollectionInfo { Path = "dongle-ff60", Vid = 0x05AC, Pid = 0x024F, UsagePage = 0xFF60, Usage = 0x61, InLen = 33, OutLen = 33, Product = "F108Pro Dongle" });
+                l.Add(new HidCollectionInfo { Path = "dongle-ff59", Vid = 0x05AC, Pid = 0x024F, UsagePage = 0xFF59, Usage = 0x61, InLen = 65, OutLen = 65, Product = "F108Pro Dongle" });
             }
             return l;
         }
@@ -265,6 +274,30 @@ namespace LiteOptions.Tests
             ListenOpened++; Listening++;
             Listeners.Add(report);
             return new Gone(() => { Listening--; Listeners.Remove(report); });
+        }
+
+        public IAulaDongleLink OpenDongle(HidCollectionInfo info, Action<byte[]> report)
+        {
+            DongleOpened++;
+            dongleReport = report;
+            return new DongleLink(this);
+        }
+
+        sealed class DongleLink : IAulaDongleLink
+        {
+            readonly FakeAulaSource s;
+            public DongleLink(FakeAulaSource s) { this.s = s; }
+            public bool Write(byte[] r)
+            {
+                s.DongleWritten.Add((byte[])r.Clone());
+                if (!s.OnDongle) return true;
+                var a = new byte[33];
+                a[1] = r[1]; a[2] = r[2]; a[3] = r[3];
+                if (r[1] == 0x20) a[4] = (byte)s.DongleBattery;
+                s.dongleReport?.Invoke(AulaProtocol.Checksum(a));
+                return true;
+            }
+            public void Dispose() { s.DongleClosed++; s.dongleReport = null; }
         }
 
         sealed class Port : IAulaPort

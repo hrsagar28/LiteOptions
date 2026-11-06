@@ -65,7 +65,7 @@ namespace LiteOptions.UI
             if (a.Present)
                 list.Add(new DeviceDto
                 {
-                    Key = "aula", Name = "Aula F108 Pro", Kind = "Aula", Connection = a.Connection, Online = true,
+                    Key = "aula", Name = "Aula F108 Pro", Kind = "Aula", Connection = a.Connection, Online = a.Connection != "2.4 GHz dongle" || a.DongleAwake,
                     Pid = a.Connection == "USB cable" ? AulaProtocol.CablePid : AulaProtocol.DonglePid,
                     Firmware = a.Version == 0 ? "" : "v" + a.Version.ToString("X4"), CanConfigure = a.CanConfigure, LastError = a.LastError ?? "",
                     HasBattery = a.Battery >= 0, BatteryPercent = a.Battery, BatteryLow = a.Battery >= 0 && a.Battery <= Settings.LowBatteryPercent,
@@ -183,12 +183,12 @@ namespace LiteOptions.UI
                 case "aulaLight":
                     // the window saves the chosen lighting first; only an explicit change here writes it to the keyboard
                     if (Settings.AulaLight == null) return new IpcMessage { Error = "no lighting chosen" };
-                    if (!Aula.Snapshot().CanConfigure) return new IpcMessage { Error = "Plug the keyboard in with its USB cable to change the lighting." };
+                    if (!Aula.Snapshot().CanConfigure) return new IpcMessage { Error = "Over Bluetooth the keyboard doesn't take changes. Switch it to 2.4G (the dongle) or plug in its USB-C cable." };
                     Aula.SetLighting(Settings.AulaLight);
                     return ok;
 
                 case "aulaClock":
-                    if (!Aula.Snapshot().CanConfigure) return new IpcMessage { Error = "Plug the keyboard in with its USB cable to set its clock." };
+                    if (!Aula.Snapshot().CanConfigure) return new IpcMessage { Error = "Over Bluetooth the keyboard doesn't take changes. Switch it to 2.4G (the dongle) or plug in its USB-C cable." };
                     Aula.SyncClock();
                     return ok;
 

@@ -237,7 +237,7 @@ namespace LiteOptions.SettingsApp
             var ring = Ring.Device(d, false, 40, store.IsLow(d));
             var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             texts.Children.Add(new TextBlock { Text = d.Name, Style = Ui.Style("BodyStrongTextBlockStyle"), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap });
-            string detail = (d.HasBattery ? d.BatteryText + " · " : "") + d.Connection switch { "USB cable" => "USB cable", "Bluetooth" => "Bluetooth", _ => "Dongle" };
+            string detail = (d.HasBattery ? d.BatteryText + " · " : "") + d.Connection switch { "USB cable" => "USB cable", "Bluetooth" => "Bluetooth", _ => d.Online ? "Dongle" : "Dongle · asleep" };
             texts.Children.Add(new TextBlock { Text = detail, Style = Ui.Style("Secondary"), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap });
             var g = new Grid { ColumnSpacing = 12 };
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });

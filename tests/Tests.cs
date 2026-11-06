@@ -505,19 +505,66 @@ namespace LiteOptions.Tests
             // dongle only: listens, never writes, can't configure
             var settings = new AppSettings(); settings.Normalize();
             var src = new FakeAulaSource { Dongle = true };
-            var m = new AulaManager(src, () => settings) { DelayMs = 0, Now = () => new DateTime(2026, 11, 6, 16, 5, 9) };
+            var now = new DateTime(2026, 11, 6, 16, 5, 9);
+            var m = new AulaManager(src, () => settings) { DelayMs = 0, EchoTimeoutMs = 1, Now = () => now };
             int changes = 0; m.Changed += () => changes++;
             m.ScanForTests(); m.RunPendingForTests();
             var st = m.Snapshot();
-            Check(st.Connection == "2.4 GHz dongle" && !st.CanConfigure, "dongle found, settings not available: " + st.Connection);
-            Check(src.Listening == 1 && src.Opened == 0 && src.Written.Count == 0, "dongle: one vendor collection opened to listen, nothing written");
+            Check(st.Connection == "2.4 GHz dongle" && !st.DongleAwake && st.Battery == -1, "dongle plugged in, keyboard not answering: " + st.Connection);
+            Check(src.DongleOpened == 1 && src.Listening == 2 && src.Opened == 0 && src.Written.Count == 0, "dongle: command channel opened, two others listened to, nothing on a cable");
+            Check(src.DongleWritten.Count == 3 && src.DongleWritten.All(r => r.Length == 33 && r[1] == 0x20 && r[2] == 0x01 && r[32] == 0x21),
+                "keyboard not answering: only the battery query (20 01, checksum 21), 3 tries");
             src.Listeners[0](new byte[] { 0x05, 0x40, 0x18 });
             src.Listeners[0](new byte[] { 0x05, 0x40, 0x18 });
-            Check(Logger.Snapshot().Contains("Aula dongle page FF00: 05 40 18"), "dongle reports logged as hex");
+            Check(Logger.Snapshot().Contains("Aula dongle page FFFF: 05 40 18"), "other dongle reports logged as hex");
             string err = null;
+            src.DongleWritten.Clear();
             m.SetLighting(new AulaLighting { Mode = 1 }, e => err = e); m.RunPendingForTests();
-            Check(err != null && err.Contains("cable") && src.Written.Count == 0, "lighting on the dongle refused without writing: " + err);
+            Check(err != null && err.Contains("wake") && src.Written.Count == 0, "lighting with the keyboard not answering: error, tells you to wake it: " + err);
             Check(changes > 0, "the window is told about the keyboard");
+
+            // the keyboard wakes up on the dongle: battery, then the clock
+            src.OnDongle = true; src.DongleWritten.Clear();
+            now = now.AddMinutes(1);   // the "linked" report is acted on at most every 5 seconds
+            src.Listeners[0](new byte[] { 0x05, 0xA6, 0xFF, 0x01 });   // the dongle's "linked" report: ask straight away
+            m.RunPendingForTests();
+            st = m.Snapshot();
+            Check(st.Connection == "2.4 GHz dongle" && st.DongleAwake && st.Battery == 59 && st.CanConfigure, "keyboard on the dongle: battery 59% from its answer: " + st.Connection + " awake=" + st.DongleAwake + " batt=" + st.Battery + " can=" + st.CanConfigure + " writes=" + src.DongleWritten.Count);
+            var clock = src.DongleWritten.FirstOrDefault(r => r[1] == 0x0C);
+            Check(clock != null && clock[2] == 0x10 && clock[5] == 1 && clock[6] == 0x5A && clock[7] == 26 && clock[8] == 11 && clock[9] == 6 && clock[10] == 16 && clock[11] == 6 && clock[12] == 9
+                  && clock[14] == 5 && clock[18] == 0xAA && clock[19] == 0x55 && AulaProtocol.ChecksumOk(clock), "clock set through the dongle when it turns up: 0C 10 … 5A 26-11-06 16:06:09 Fri, AA 55, checksum");
+            Check(m.Snapshot().ClockSyncedAt == now, "dongle clock sync remembered");
+            src.DongleWritten.Clear();
+            m.DonglePollForTests(); m.RunPendingForTests();
+            Check(src.DongleWritten.Count == 1 && src.DongleWritten[0][1] == 0x20, "next poll: just the battery query, no second clock within the hour");
+            src.DongleBattery = 41;
+            m.DonglePollForTests(); m.RunPendingForTests();
+            Check(m.Snapshot().Battery == 41, "battery follows the keyboard's answers");
+            src.DongleSends(AulaProtocol.Checksum(new byte[] { 0, 0x20, 0x01, 0x00, 0x26, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 }));
+            m.RunPendingForTests();
+            Check(m.Snapshot().Battery == 38, "battery answers to the Aula app's own queries count too");
+            var bad = AulaProtocol.Checksum(new byte[33]); bad[1] = 0x20; bad[2] = 0x01; bad[4] = 0x10;  // checksum now wrong
+            src.DongleSends(bad); m.RunPendingForTests();
+            Check(m.Snapshot().Battery == 38, "an answer with a wrong checksum is ignored");
+
+            // lighting through the dongle
+            src.DongleWritten.Clear(); err = "x";
+            m.SetLighting(new AulaLighting { Mode = 7, R = 0x80, G = 0x10, B = 0xFF, Brightness = 4, Speed = 2, Direction = 1 }, e => err = e); m.RunPendingForTests();
+            var lp = src.DongleWritten.FirstOrDefault();
+            Check(err == null && src.DongleWritten.Count == 1 && src.Written.Count == 0, "lighting over the dongle: one report, echoed");
+            Check(lp != null && lp[0] == 0 && lp[1] == 0x05 && lp[2] == 0x10 && lp[3] == 0 && lp[4] == 7 && lp[5] == 0x80 && lp[6] == 0x10 && lp[7] == 0xFF
+                  && lp[12] == 0 && lp[13] == 4 && lp[14] == 2 && lp[15] == 1 && lp[18] == 0xAA && lp[19] == 0x55 && AulaProtocol.ChecksumOk(lp),
+                "dongle lighting packet: 05 10 00, mode, colour, rainbow, brightness, speed, direction, AA 55, checksum");
+            var loff = AulaProtocol.DongleLighting(new AulaLighting { Mode = 0, R = 9 });
+            Check(loff[4] == 0 && loff[5] == 0 && loff[13] == 0 && loff[18] == 0xAA, "dongle lighting off: only the mode and the end marker");
+            Check(Logger.Snapshot().Contains("lighting set to Breathing") && Logger.Snapshot().Contains("(dongle)"), "dongle lighting logged");
+
+            // the keyboard goes quiet (asleep): after the poll window it no longer counts as answering
+            src.OnDongle = false;
+            now = now.AddMinutes(4);
+            m.DonglePollForTests(); m.RunPendingForTests();
+            st = m.Snapshot();
+            Check(st.Connection == "2.4 GHz dongle" && !st.DongleAwake && st.Battery == 38 && st.CanConfigure, "keyboard quiet for 4 minutes (asleep): not answering, last battery kept, changes still allowed (they wake-check)");
 
             // cable plugged in: the clock is set once, lighting left alone
             src.Cable = true;
@@ -526,7 +573,7 @@ namespace LiteOptions.Tests
             Check(st.Connection == "USB cable" && st.CanConfigure && st.Version == 0x0120, "cable wins over the dongle; settings open");
             Check(src.Written.Count == 4 && src.Written[0][1] == 0x18 && src.Written[1][1] == 0x28 && src.Written[2][2] == 0x5A && src.Written[3][1] == 0x02 && src.Reads == 4,
                 "plug-in: clock set with begin, start, data, apply and four read-backs");
-            Check(st.ClockSyncedAt == new DateTime(2026, 11, 6, 16, 5, 9), "clock sync time remembered");
+            Check(st.ClockSyncedAt == now, "clock sync time remembered");
             m.ScanForTests(); m.RunPendingForTests();
             Check(src.Written.Count == 4 && src.Opened == 1, "scanning again changes nothing");
 
@@ -539,7 +586,7 @@ namespace LiteOptions.Tests
 
             // cable unplugged, plugged in with clock sync off
             src.Cable = false; m.ScanForTests(); m.RunPendingForTests();
-            Check(!m.Snapshot().CanConfigure && src.Closed == 1, "cable out: settings channel closed");
+            Check(src.Closed == 1 && m.Snapshot().Connection == "2.4 GHz dongle", "cable out: settings channel closed, back to the dongle");
             settings.AulaClockSync = false; src.Written.Clear();
             src.Cable = true; m.ScanForTests(); m.RunPendingForTests();
             Check(m.Snapshot().CanConfigure && src.Written.Count == 0, "clock sync switched off: nothing written on plug-in");
@@ -551,26 +598,34 @@ namespace LiteOptions.Tests
             Check(err != null && !st.CanConfigure && st.LastError != "" && src.Closed == 2, "failed write: error shown, channel closed to reopen: " + err);
 
             // on Bluetooth (dongle still plugged in): Bluetooth wins, battery from Windows, nothing written
-            src.FailWrites = false; src.Cable = false; src.Dongle = true; src.Bluetooth = 64; src.Written.Clear();
+            src.FailWrites = false; src.Cable = false; src.Dongle = true; src.OnDongle = false; src.Bluetooth = 64; src.Written.Clear();
+            now = now.AddMinutes(10);
             m.ScanForTests(); m.RunPendingForTests();
             st = m.Snapshot();
             Check(st.Connection == "Bluetooth" && st.Battery == 64 && st.BluetoothName == "AULA-F108Pro-1" && !st.CanConfigure && src.Written.Count == 0,
                 "Bluetooth: connection and Windows' battery level, nothing written: " + st.Connection + " " + st.Battery);
-            Check(Logger.Snapshot().Contains("on Bluetooth as \"AULA-F108Pro-1\": battery 64%"), "Bluetooth battery logged");
+            Check(Logger.Snapshot().Contains("now on Bluetooth as \"AULA-F108Pro-1\", battery 64%"), "Bluetooth battery logged");
             src.Bluetooth = 12; changes = 0;
             m.ScanForTests(); m.RunPendingForTests();
             Check(m.Snapshot().Battery == 12 && changes > 0, "battery change noticed on the next look");
             src.Bluetooth = -1;
             m.ScanForTests(); m.RunPendingForTests();
             Check(m.Snapshot().Connection == "Bluetooth" && m.Snapshot().Battery == -1, "Bluetooth without a battery level: unknown, not 0");
-            src.Bluetooth = -2;
+            // switched to the dongle while Windows still lists it on Bluetooth: its answer through the dongle wins
+            src.Bluetooth = 60; src.OnDongle = true; src.DongleBattery = 58;
+            m.DonglePollForTests(); m.RunPendingForTests();
+            st = m.Snapshot();
+            Check(st.Connection == "2.4 GHz dongle" && st.Battery == 58 && st.CanConfigure, "answering through the dongle beats a lingering Bluetooth entry: " + st.Connection);
+            Check(Logger.Snapshot().Contains("now on 2.4 GHz dongle, battery 58%"), "connection change logged");
+            src.Bluetooth = -2; src.OnDongle = false;
+            now = now.AddMinutes(10);
             m.ScanForTests(); m.RunPendingForTests();
-            Check(m.Snapshot().Connection == "2.4 GHz dongle" && m.Snapshot().Battery == -1, "off Bluetooth: back to the dongle, battery unknown");
+            Check(m.Snapshot().Connection == "2.4 GHz dongle" && m.Snapshot().Battery == 58 && !m.Snapshot().DongleAwake, "off Bluetooth, keyboard quiet: dongle, last battery kept");
 
             // keyboard gone entirely
             src.FailWrites = false; src.Cable = false; src.Dongle = false;
             m.ScanForTests(); m.RunPendingForTests();
-            Check(!m.Snapshot().Present && src.Listening == 0, "nothing plugged in: not present, listener closed");
+            Check(!m.Snapshot().Present && src.Listening == 0 && src.DongleClosed >= 1, "nothing plugged in: not present, dongle channel and listeners closed");
 
             // settings: the Aula fields survive a save and load; old files get clock sync on
             settings.AulaLight = new AulaLighting { Mode = 7, R = 10, G = 20, B = 30, Rainbow = true, Brightness = 2, Speed = 1 };

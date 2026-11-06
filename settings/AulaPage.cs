@@ -25,9 +25,8 @@ namespace LiteOptions.SettingsApp
         };
 
         readonly SettingCard statusCard, effectCard, colourCard, rainbowCard, brightCard, speedCard, dirCard, syncCard;
-        readonly NoteCard errorNote, cableNote, batteryNote;
+        readonly NoteCard errorNote, cableNote;
         readonly SettingsGroup lightGroup, clockGroup;
-        readonly TextBlock batteryHeader;
         readonly ComboBox effect;
         readonly ToggleSwitch rainbow, sync;
         readonly Slider bright, speed;
@@ -52,7 +51,7 @@ namespace LiteOptions.SettingsApp
 
             // ── backlight ──
             Section("Backlight", Note("Fn shortcuts on the keyboard change it too"));
-            cableNote = Add(new NoteCard("The keyboard takes lighting changes only over its USB-C cable. Plug it in to change these."));
+            cableNote = Add(new NoteCard("Over Bluetooth the keyboard doesn't take changes. Switch it to 2.4G (the dongle) or plug in its USB-C cable to change these."));
             cableNote.Margin = new Thickness(0, 0, 0, 4);
             lightGroup = Group();
 
@@ -106,17 +105,14 @@ namespace LiteOptions.SettingsApp
             clockGroup = Group();
             sync = Ui.Toggle();
             sync.Toggled += (s, e) => { if (loading) return; store.Settings.AulaClockSync = sync.IsOn; store.Save(); };
-            syncCard = Find(clockGroup.Add(new SettingCard(Glyph.Clock, "Set the clock when the cable is plugged in", "", sync)), "aula clock time date screen sync");
+            syncCard = Find(clockGroup.Add(new SettingCard(Glyph.Clock, "Set the clock when the keyboard connects", "", sync)), "aula clock time date screen sync");
             syncNow = Ui.Button("Set it now", Glyph.Refresh, click: async (s, e) => await SyncNow());
-            clockGroup.Add(new SettingCard(null, "Set the clock to this PC's time now", "Needs the USB cable", syncNow).Indent());
+            clockGroup.Add(new SettingCard(null, "Set the clock to this PC's time now", "Over the cable or the dongle", syncNow).Indent());
 
-            // ── battery ──
-            batteryHeader = Section("Battery");
-            batteryNote = Add(new NoteCard("On Bluetooth, LiteOptions shows the keyboard's battery and warns you when it's low. On the dongle it's still learning how the battery is reported; the keyboard's screen shows it meanwhile."));
         }
 
         /// <summary>"Cable", "Bluetooth" or "Dongle".</summary>
-        public static string ShortConnection(DeviceDto d) => d.Connection == "USB cable" ? "Cable" : d.Connection == "Bluetooth" ? "Bluetooth" : "Dongle";
+        public static string ShortConnection(DeviceDto d) => d.Connection == "USB cable" ? "Cable" : d.Connection == "Bluetooth" ? "Bluetooth" : d.Online ? "Dongle" : "Dongle · asleep";
 
         static TextBlock Value() => new TextBlock { Width = 24, VerticalAlignment = VerticalAlignment.Center, Style = Ui.Style("BodyStrongTextBlockStyle") };
 
@@ -217,25 +213,23 @@ namespace LiteOptions.SettingsApp
             if (d == null)
             {
                 statusCard.Title = "Aula F108 Pro: not found";
-                statusCard.Description = "Plug in its 2.4 GHz dongle or its USB-C cable. LiteOptions can't see it over Bluetooth.";
+                statusCard.Description = "Not connected. Switch it on, or plug in its 2.4 GHz dongle or USB-C cable.";
             }
             else
             {
                 statusCard.Title = "Aula F108 Pro";
+                string batt = d.HasBattery ? " · battery " + d.BatteryText : "";
                 statusCard.Description = d.Connection == "USB cable"
                     ? "Connected by USB cable" + (d.Firmware != "" ? " · " + d.Firmware : "")
-                    : d.Connection == "Bluetooth"
-                    ? "Connected by Bluetooth" + (d.HasBattery ? " · battery " + d.BatteryText : "") + ". Lighting and the clock change over the USB cable."
-                    : "Dongle plugged in. Lighting and the clock change over the USB cable.";
+                    : d.Connection == "Bluetooth" ? "Connected by Bluetooth" + batt
+                    : d.Online ? "Connected by 2.4 GHz dongle" + batt
+                    : "Dongle plugged in, but the keyboard isn't answering. Press a key to wake it, or check it's switched to 2.4G." + (d.HasBattery ? " Last battery reading " + d.BatteryText + "." : "");
             }
             cableNote.Shown = !cable;
             lightGroup.IsEnabled = cable;
             lightGroup.Opacity = cable ? 1 : 0.6;
             syncNow.IsEnabled = cable;
-            syncCard.Description = d != null && d.ClockSynced != "" ? "Last set " + d.ClockSynced : "Keeps the date and time on its screen right";
-            bool donglePending = d != null && d.Connection == "2.4 GHz dongle";
-            batteryNote.Shown = donglePending;
-            Show(batteryHeader, donglePending);
+            syncCard.Description = d != null && d.ClockSynced != "" ? "Last set " + d.ClockSynced : "On the cable or the dongle; keeps the date and time on its screen right";
             if (d != null && d.LastError != "") ShowError(d.LastError);
             else if (d == null || cable) errorNote.Shown = false;
         }

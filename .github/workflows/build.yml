@@ -232,6 +232,13 @@ jobs:
 
             Double-click it to install or update (your settings are kept). Windows may say "Windows protected your PC" because the file isn't signed: click **More info**, then **Run anyway**.
 
+            New in 2.5: Aula F108 Pro on its 2.4 GHz dongle
+            - Battery level through the dongle, with the ring, the tray badge and the low-battery warning. The last reading stays while the keyboard sleeps.
+            - Lighting changes and "Set it now" for the clock work over the dongle as well as the cable; the screen clock is set when the keyboard connects (at most once an hour).
+            - Uses the dongle commands the Aula app itself sends (battery, lighting, clock), each confirmed by the keyboard's echo.
+            - Fixed: after switching from Bluetooth to the dongle, LiteOptions could keep showing Bluetooth for a few minutes.
+            - Over Bluetooth the keyboard takes no changes (it has no settings channel there); the page says so.
+
             New in 2.4.1:
             - Aula F108 Pro on Bluetooth: LiteOptions recognises it, shows the battery level Windows has for it (on its page, in the menu and in the tray panel, with a ring) and warns when it's low.
             - The Aula also appears in the tray panel next to the mouse and keyboard.
