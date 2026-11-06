@@ -27,6 +27,7 @@ namespace LiteOptions.SettingsApp
         readonly SettingCard statusCard, effectCard, colourCard, rainbowCard, brightCard, speedCard, dirCard, syncCard;
         readonly NoteCard errorNote, cableNote, batteryNote;
         readonly SettingsGroup lightGroup, clockGroup;
+        readonly TextBlock batteryHeader;
         readonly ComboBox effect;
         readonly ToggleSwitch rainbow, sync;
         readonly Slider bright, speed;
@@ -110,7 +111,7 @@ namespace LiteOptions.SettingsApp
             clockGroup.Add(new SettingCard(null, "Set the clock to this PC's time now", "Needs the USB cable", syncNow).Indent());
 
             // ── battery ──
-            Section("Battery");
+            batteryHeader = Section("Battery");
             batteryNote = Add(new NoteCard("The keyboard's screen shows its battery level. LiteOptions is learning how the dongle reports it, so it can show it here and warn you when it's low."));
         }
 
@@ -228,6 +229,7 @@ namespace LiteOptions.SettingsApp
             syncNow.IsEnabled = cable;
             syncCard.Description = d != null && d.ClockSynced != "" ? "Last set " + d.ClockSynced : "Keeps the date and time on its screen right";
             batteryNote.Shown = d != null && !cable;
+            Show(batteryHeader, d != null && !cable);
             if (d != null && d.LastError != "") ShowError(d.LastError);
             else if (d == null || cable) errorNote.Shown = false;
         }
